@@ -1,0 +1,23 @@
+---
+- include_tasks: "../cleanup/main.yml"
+
+- name: Get number of Docker Swarm nodes.
+  shell: docker info --format '{% raw %}{{.Swarm.Nodes}}{% endraw %}'
+  register: node_count_query
+
+- name: Get number of Docker Swarm managers.
+  shell: docker info --format '{% raw %}{{.Swarm.Managers}}{% endraw %}'
+  register: manager_count_query
+
+- set_fact:
+    swarm_node_count: "{{ node_count_query.stdout_lines[0] | int }}"
+    swarm_manager_count: "{{ manager_count_query.stdout_lines[0] | int }}"
+
+- set_fact:
+    swarm_worker_count: "{{ swarm_node_count|int - swarm_manager_count|int }}"
+
+- assert:
+    that:
+    - "swarm_worker_count == expected_docker_swarm_workers"
+    - "swarm_manager_count == expected_docker_swarm_managers"
+    msg: "'swarm_manager_count' ({{ swarm_manager_count }}) must be exactly {{ expected_docker_swarm_managers }} and 'swarm_worker_count' ({{ swarm_worker_count }}) must be exactly {{ expected_docker_swarm_workers }}."

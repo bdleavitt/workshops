@@ -1,0 +1,36 @@
+---
+- import_playbook: "install-engine.yml"
+
+- name: "Initialize Swarm"
+  hosts: ucp-primary
+  gather_facts: False
+  roles:
+  - { role: docker-swarm, docker_swarm_role_mode: "init" }
+  tags: ['swarm', 'Swarm', 'managers']
+
+- name: "Join Swarm (as managers)"
+  gather_facts: False
+  hosts: managers:!ucp-primary
+  roles:
+  - role: docker-swarm
+  tags: ['swarm', 'Swarm']
+  vars:
+    docker_swarm_token_type: "swarm-manager-token"
+    docker_swarm_leader:     "ucp-primary"
+    docker_swarm_role_mode:  "join"
+
+# We need to grab these images for dev builds here
+- import_playbook: extras.yml
+  when: use_dev_version is defined or ci_running is defined
+
+- name: "Join Swarm (as workers)"
+  gather_facts: False
+  hosts: workers
+  roles:
+  - role: docker-swarm
+  tags: ['swarm', 'Swarm']
+  vars:
+    docker_swarm_token_type: "swarm-worker-token"
+    docker_swarm_leader:     "ucp-primary"
+    docker_swarm_role_mode:  "join"
+

@@ -1,0 +1,26 @@
+---
+
+- set_fact:
+    default_docker_storage_fstype: btrfs
+    default_docker_storage_driver: btrfs
+
+- name: Check for mkfs.btrfs
+  stat:
+    path: "/usr/sbin/mkfs.btrfs"
+  register: mkfs_btrfs_stat
+
+- name: Install btrfsprogs
+  package:
+    name: btrfsprogs
+  when: mkfs_btrfs_stat.stat.exists == false
+
+- name: "Update udev rules for SLES12 SP2 (Azure only)"
+  when: ansible_distribution_version == "12.2" and infra_stack == "azure"
+  block:
+  - name: Update the Azure Storage rules
+    copy:
+      src: "{{ role_path }}/files/66-azure-storage.rules"
+      dest: /etc/udev/rules.d/66-azure-storage.rules
+      mode: 0644
+  - name: Apply the Azure Storage rules
+    shell: udevadm trigger

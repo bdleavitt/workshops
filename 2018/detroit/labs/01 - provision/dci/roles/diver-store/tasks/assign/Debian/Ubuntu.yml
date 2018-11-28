@@ -1,0 +1,5 @@
+---
+- set_fact:
+    docker_ee_subscriptions_ubuntu: "{{hostvars['localhost']['docker_ee_subscriptions_ubuntu']}}"
+    docker_ucp_license_path: "./docker-ee-ubuntu.lic"
+  when: hostvars['localhost']['docker_ee_subscriptions_ubuntu'] is defined

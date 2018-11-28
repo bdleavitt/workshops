@@ -1,0 +1,72 @@
+---
+- name: "Enable Kuberenetes Cloud Provider for UCP 3.1"
+  set_fact:
+      enable_kubernetes_cloud_provider: True
+  when: docker_ucp_version == "latest" or docker_ucp_version is version('3.1.0', '>=')
+
+- name: "Check if this is UCP 3.0"
+  set_fact:
+    docker_ucp_version_check: "{{ docker_ucp_version | regex_replace('^([0-9]+\\.[0-9]+)\\.[0-9]+.*', '\\1') }}"
+
+- name: "Set a fact if this is UCP 3.0"
+  set_fact:
+    docker_ucp_version_30: docker_ucp_version_check == "3.0"
+
+- name: "Create Kubernetes file for Azure"
+  when: enable_kubernetes_cloud_provider
+  block:
+  - name: "Ensure /etc/kubernetes dir exists."
+    file:
+      path: /etc/kubernetes
+      state: directory
+  - name: "Produce the configuration"
+    copy:
+      content: "{{ kubernetes_azure_json}}"
+      dest: /etc/kubernetes/azure.json
+      mode: 0644
+    when: kubernetes_azure_json is defined
+
+- name: "Check if UCP is running."
+  when: docker_ucp_version_30 and 'ucp-primary' in group_names
+  shell: "docker service ls -q --filter name=az-nic-ips"
+  register: _aznicips_already_running
+
+- name: "Set aznicips_already_running fact."
+  when: docker_ucp_version_30 and 'ucp-primary' in group_names
+  set_fact:
+    aznicips_already_running: "{{ _aznicips_already_running.stdout_lines | length > 0 }}"
+
+- name: "Check if Secret is set."
+  when: docker_ucp_version_30 and 'ucp-primary' in group_names
+  shell: "docker secret ls -q --filter name=azure_ucp_admin.toml"
+  register: _aznicips_already_set
+
+- name: "Set _aznicips_already_set fact."
+  when: docker_ucp_version_30 and 'ucp-primary' in group_names
+  set_fact:
+    aznicips_already_set: "{{ _aznicips_already_set.stdout_lines | length > 0 }}"
+
+- name: "Create az-nic-ips secret"
+  when: docker_ucp_version_30 and aznicips_already_set is defined and not aznicips_already_set and 'ucp-primary' in group_names
+  shell: docker secret create azure_ucp_admin.toml -
+  args:
+    stdin: |
+      AZURE_CLIENT_ID = "{{ azure_app_id }}"
+      AZURE_CLIENT_SECRET = "{{ azure_app_secret }}"
+      AZURE_TENANT_ID = "{{ azure_tenant_id }}"
+      AZURE_SUBSCRIPTION_ID = "{{ azure_subscription_id }}"
+
+- name: "Create az-nic-ips service"
+  when: docker_ucp_version_30 and aznicips_already_running is defined and not aznicips_already_running and 'ucp-primary' in group_names
+  shell: >
+    docker service create
+    --mode=global
+    --name az-nic-ips
+    --secret=azure_ucp_admin.toml
+    --log-driver json-file
+    --log-opt max-size=1m
+    --env IP_COUNT={{ azure_nic_ips_count }}
+    --constraint "node.platform.os == linux"
+    docker4x/az-nic-ips:latest
+
+

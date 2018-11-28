@@ -1,0 +1,13 @@
+---
+- meta: end_play
+  when: not enable_kubernetes_nfs_storage
+
+- name: "Installation ( {{ ansible_os_family }} )."
+  include_tasks: "{{ os_family }}.yml"
+  when: ansible_os_family == os_family
+  with_items:
+    - "Debian"
+    - "RedHat"
+    - "Suse"
+  loop_control:
+    loop_var: os_family

@@ -1,0 +1,66 @@
+---
+
+# Log in, so that we can access the required images.
+- import_playbook: "docker-login.yml"
+
+# When we later run the UCP installer, it will try to run ucp-agent on all the other nodes.
+# This will fail by default if ucp-agent is in a private repository.
+# We therefore query for the complete list of images needed and then use our login session
+# to pull them all now, so they will be available later when they are needed.
+- name: "Query for other required dev images"
+  hosts: ucp-primary
+  become: True
+  gather_facts: false
+  tasks:
+  - name: "ucp pull"
+    shell: docker pull "{{ docker_ucp_image_repository }}/ucp:{{ docker_ucp_version }}"
+
+  - name: "ucp images"
+    shell: docker run --rm "{{ docker_ucp_image_repository }}/ucp:{{ docker_ucp_version }}" images --image-version "dev:" --list
+    register: ucp_images
+
+# Pull all required UCP images to all UCP nodes.
+- name: "Pull required UCP dev images."
+  hosts: all:!windows
+  gather_facts: false
+  become: True
+  tasks:
+  - name: "docker pull"
+    shell: "docker pull {{ item }}"
+    with_items: "{{ hostvars[groups['ucp-primary'][0]].ucp_images.stdout_lines }}"
+
+# Windows
+
+- name: "Query for required Windows images"
+  hosts: ucp-primary
+  gather_facts: false
+  become: True
+  tasks:
+  - name: "Query for required Windows images"
+    shell: docker run --rm "{{ docker_ucp_image_repository }}/ucp:{{ docker_ucp_version }}" images --image-version "dev:" --list --enable-windows
+    register: win_images
+
+- name: "Extract precise version of ucp-agent-win"
+  hosts: ucp-primary
+  gather_facts: false
+  become: True
+  tasks:
+  - set_fact:
+      win_agent_version: "{{ win_images.stdout_lines  | select('match', '.*ucp-agent-win:.*') | list | first | regex_replace('.*ucp-agent-win:(.*)', '\\1') }}"
+
+- name: "Change the Windows Workers docker_ucp_version"
+  hosts: windows
+  gather_facts: false
+  become: True
+  tasks:
+  - set_fact:
+      docker_ucp_version:  "{{ hostvars[groups['ucp-primary'][0]].win_agent_version }}"
+
+- name: "Configure Windows workers"
+  hosts: windows
+  gather_facts: false
+  become: True
+  tasks:
+  - name: "docker pull"
+    raw: "docker pull {{ item }}"
+    with_items: "{{ hostvars[groups['ucp-primary'][0]].win_images.stdout_lines }}"

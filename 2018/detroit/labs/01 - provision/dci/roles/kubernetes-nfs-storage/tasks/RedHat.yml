@@ -1,0 +1,31 @@
+---
+- name: "Install required NFS dependencies (RedHat 7.3)."
+  when: ansible_distribution == 'RedHat' and ansible_distribution_version == '7.3'
+  block:
+  - name: "Install nfs-utils."
+    yum:
+      name: "nfs-utils"
+      state: present
+  - name: "Start rpcbind"
+    service:
+      name: rpcbind
+      state: started
+      enabled: true
+
+- name: "Install required NFS dependencies (RedHat 7.4 / 7.5)."
+  when: ansible_distribution == 'RedHat' and ( ansible_distribution_version == '7.4' or ansible_distribution_version == '7.5' )
+  block:
+  - name: "Install nfs-utils."
+    yum:
+      name: "nfs-utils"
+      state: present
+  - name: "Start rpcbind"
+    service:
+      name: rpcbind
+      state: started
+      enabled: true
+  - name: "Start rpc-statd"
+    service:
+      name: rpc-statd
+      state: started
+      enabled: true

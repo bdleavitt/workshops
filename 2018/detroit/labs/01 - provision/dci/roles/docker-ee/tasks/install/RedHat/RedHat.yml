@@ -1,0 +1,49 @@
+---
+
+- name: "Get Kernel version"
+  shell:
+    uname -r | sed -e $'s/[\.-]/\\\n/g'
+  register: kernel_shell_output
+
+- name: "Splitting out kernel version elements"
+  set_fact:
+    kernel_major: "{{ kernel_shell_output.stdout_lines[0] }}"
+    kernel_minor: "{{ kernel_shell_output.stdout_lines[1] }}"
+    kernel_maint: "{{ kernel_shell_output.stdout_lines[2] }}"
+    kernel_patch: "{{ kernel_shell_output.stdout_lines[3] }}"
+
+- name: "Setting fact if kernel is < 3.10.x-514"
+  set_fact:
+    kernel_needs_update: "( {{ kernel_major | int }} <= 3 ) and ( {{ kernel_minor | int }} <= 10 ) and ( {{ kernel_patch | int }} <  514 ) "
+
+- name: "Update if kernel < 3.10.0-514"
+  become: true
+  yum:
+    name: "kernel"
+    state: latest
+    update_cache: true
+  when: kernel_needs_update
+
+- name: Reboot the server
+  become: true
+  shell: /usr/bin/systemd-run --on-active=10 /usr/bin/systemctl --force reboot
+  async: 0
+  poll: 0
+  when: kernel_needs_update
+
+- name: Wait for server to shutdown
+  local_action: shell /usr/bin/nc -z {{ ansible_host }} 22
+  register: result
+  until: result.rc != 0
+  failed_when: result.rc == -1
+  retries: 120
+  delay: 1
+  when: kernel_needs_update
+
+- name: Wait for server to be ready
+  local_action: shell /usr/bin/nc -z {{ ansible_host }} 22
+  register: result
+  until: result.rc == 0
+  retries: 200
+  delay: 3
+  when: kernel_needs_update

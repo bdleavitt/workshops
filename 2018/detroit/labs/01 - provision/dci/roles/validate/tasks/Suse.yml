@@ -1,0 +1,62 @@
+---
+- when: not enable_offline_install
+  block:
+  # Begin block: not enable_offline_install
+  - assert:
+      that:
+        - docker_ee_subscriptions_sles is defined
+      msg: "You need 'docker_ee_subscriptions_sles' defined in order to install Docker EE on Suse-based hosts."
+  # Begin block: not enable_offline_install
+
+- when: enable_offline_install
+  block:
+  # Begin block: enable_offline_install
+  - assert:
+      that:
+        - (docker_ee_package_sles | default(docker_ee_package)) is defined
+        - (docker_ee_gpg_sles | default(docker_ee_gpg)) is defined
+  # End block: enable_offline_install
+
+# Begin SLES 12.2
+#TODO need 17.06.2-ee-8 check for 2.0
+- name: UCP and SLES 12.2 check
+  assert:
+    that:
+      -  " docker_ucp_version is version  ('2.2.2', '>=') "
+    msg: |
+      " SLES 12.2 is supported on version UCP greater than 2.2.2."
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - " ansible_distribution == 'SUSE' "
+    - " ansible_distribution_version is version ('12.2','=') "
+    - " docker_ucp_version is defined "
+    - " docker_matrix_enforce == true "
+# Begin SLES 12.3
+# TODO need 17.06 vs 2.0 distinction
+- name: SLES 12.3 check for UCP
+  assert:
+    that:
+      - "docker_ucp_version is version ('3.0.0', '>')"
+    msg: |
+      " SLES 12.3 and EE2.0 require UCP version 3.0.1."
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - " ansible_distribution == 'SUSE' "
+    - " ansible_distribution_version is version ('12.3', '=') "
+    - " docker_ucp_version is defined "
+    - " docker_matrix_enforce == true "
+# Begin SLES 15
+# TODO make sure this assertion works once full support of SLES 15 hits
+- name: SLES 15 check for UCP
+  assert:
+    that:
+      - "docker_ucp_version is version ('3.1', '>=')"
+    msg: |
+      " SLES 15 and EE2.1 require UCP version 3.1."
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - " ansible_distribution == 'SUSE' "
+    - " ansible_distribution_version is version ('15', '>=') "
+    - " docker_ee_version == '2.1' "
+    - " docker_ucp_version is defined "
+    - " docker_matrix_enforce == true "

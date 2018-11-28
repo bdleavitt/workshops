@@ -1,0 +1,26 @@
+---
+# Make sure python is installed
+- name: "Install Ansible requirements (Python)"
+  hosts: all:!windows
+  strategy: free
+  gather_facts: False
+  roles:
+  - role: ansible-requirements
+  tags: ['always']
+
+- name: "Make sure windows hosts can be contacted"
+  hosts: windows
+  strategy: free
+  gather_facts: False
+  any_errors_fatal: true
+  roles:
+  - role: host-readiness
+  tags: ['always', 'win', 'windows']
+
+
+- hosts: all
+  roles:
+  - role: validate
+  tags:
+  - validate
+  any_errors_fatal: true

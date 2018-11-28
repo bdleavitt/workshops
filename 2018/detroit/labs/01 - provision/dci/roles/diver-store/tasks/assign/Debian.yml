@@ -1,0 +1,10 @@
+---
+#
+# OS Specific Updates
+#
+- include_tasks: "Debian/{{ distribution }}.yml"
+  when: ansible_distribution == distribution
+  with_items:
+    - "Ubuntu"
+  loop_control:
+    loop_var: distribution

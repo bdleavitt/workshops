@@ -1,0 +1,76 @@
+---
+- when: not enable_offline_install
+  block:
+  # Begin block: not enable_offline_install
+  - assert:
+      that:
+        - docker_ee_subscriptions_redhat is defined
+      msg: "You need 'docker_ee_subscriptions_redhat' defined in order to install Docker EE on RHEL hosts."
+  # End block: not enable_offline_install
+
+- when: enable_offline_install
+  block:
+  # Begin block: enable_offline_install
+  - assert:
+      that:
+        - (docker_ee_package_redhat | default(docker_ee_package)) is defined
+  # End block: enable_offline_install
+
+# Begin 17.06 / 2.0 Block
+# RHEL 7.5 check
+# Todo 17.06.2-ee-16 check needed
+- name: RHEL 7.5 version check
+  assert:
+    that:
+      - docker_ucp_version is version ('2.2.11', '>=')
+      - docker_dtr_version is version ('2.4.6', '>=')
+    msg: |
+      " RHEL 7.5 UCP supports starts with 2.2.11."
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - " ansible_distribution_version >= '7.5'"
+    - " docker_ee_version == '17.06'"
+    - " docker_ucp_version is defined"
+    - " docker_dtr_version is defined"
+    - " docker_matrix_enforce == true "
+
+
+# RHEL 7.1 - 7.4 check
+- name: RHEL 7.1 - 7.4 check
+  assert:
+    that:
+      - docker_ucp_version is version ('2.2.2', '>=')
+    msg: |
+      " RHEL 7.1 - 7.4 UCP supports starts with 2.2.2 you provided {{docker_ucp_version}}."
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - "ansible_distribution_version >= '7.1'"
+    - " ansible_distribution_version < '7.5'"
+    - "  docker_ee_version == '17.06'"
+    - "  docker_ucp_version is defined"
+    - "  docker_dtr_version is defined"
+    - " docker_matrix_enforce == true "
+
+
+
+# End 17.06 / 2.0 Block
+# Begin 2.1 block
+- name: RHEL 7.4+ support check
+  assert:
+    that:
+      - docker_ucp_version is version ('3.1', '>=')
+      - docker_dtr_version is version ('2.6', '>=')
+      - ansible_distribution_version is version ('7.4' '>=')
+    msg: |
+      " Engine version 18.09 requires RHEL 7.4+, UCP 3.1+, and DTR 2.6+ ."
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+
+  when:
+    - " docker_ee_version == '18.09'"
+    - " docker_ucp_version is defined "
+    - " docker_dtr_version is defined "
+    - " docker_matrix_enforce == true "
+
+
+
+# End 2.1 block

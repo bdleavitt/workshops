@@ -1,0 +1,16 @@
+---
+- name: "Enable FIPS in registry"
+  win_regedit:
+    path: HKLM:\System\CurrentControlSet\Control\Lsa\FipsAlgorithmPolicy
+    name: Enabled
+    data: 1
+    type: Dword
+  register: fips_reboot
+
+- name: "Restart"
+  win_reboot:
+  when: fips_reboot.changed
+
+- name: "Wait for system to become reachable over WinRM"
+  wait_for_connection:
+    timeout: 1200

@@ -1,0 +1,47 @@
+---
+- hosts: localhost
+  roles:
+  - role: validate-dtr
+  tags:
+  - validate
+  any_errors_fatal: true
+
+- import_playbook: "install-ucp.yml"
+
+- hosts: dtr-load-balancer
+  gather_facts: False
+  roles:
+  - role: load-balancer
+  tags: ['dtr', 'DTR', 'load-balancer', 'dtr-load-balancer']
+  vars:
+  - frontend: "{{ docker_dtr_lb }}"
+  - backends: "{{ groups['dtr'] }}"
+  - ports:
+    - 80
+  - ssl_ports:
+    - 443
+
+- import_playbook: "pull-dtr-images.yml"
+  when: use_dev_version | default(false)
+
+- name: "Install DTR"
+  hosts: dtr-primary
+  gather_facts: False
+  roles:
+  - role: docker-dtr
+  tags: ['dtr', 'DTR']
+  vars:
+    docker_dtr_role_mode: "install"
+    ucp_nodes:            managers
+
+- name: "Join DTR"
+  hosts: dtr-replicas
+  gather_facts: False
+  roles:
+  - role: docker-dtr
+  serial: 1
+  tags: ['dtr', 'DTR']
+  vars:
+    docker_dtr_role_mode: "join"
+    ucp_nodes:            managers
+    dtr_primary:          dtr-primary

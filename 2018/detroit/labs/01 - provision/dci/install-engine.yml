@@ -1,0 +1,48 @@
+---
+- import_playbook: "prepare-hosts.yml"
+
+- name: "Enable FIPS"
+  hosts: all
+  gather_facts: False
+  roles:
+  - { role: 'docker-fips', when: docker_enable_fips }
+  tags: ['engine', 'docker']
+
+- name: "Collect Docker Subscription Information"
+  gather_facts: False
+  hosts: localhost
+  roles:
+    - role: diver-store
+      vars:
+          diver_store_role_mode: "lookup"
+      when: docker_hub_id != "" and docker_hub_password != ""
+
+- name: "Set Docker Subscription Information"
+  hosts: all:!windows
+  roles:
+    - role: diver-store
+      vars:
+          diver_store_role_mode: "assign"
+      when: docker_hub_id != "" and docker_hub_password != ""
+
+- name: "Format Docker storage"
+  hosts: all:!windows
+  gather_facts: False
+  roles:
+  - { role: 'docker-storage', when: docker_storage_volume is defined }
+  tags: ['storage', 'docker-storage']
+
+- name: "Install Docker EE"
+  hosts: all
+  gather_facts: False
+  roles:
+  - role: docker-ee
+  tags: ['engine', 'docker']
+  vars:
+    docker_ee_subscriptions:
+      Ubuntu:      "{{ docker_ee_subscriptions_ubuntu|default('omitted') }}"
+      RedHat:      "{{ docker_ee_subscriptions_redhat|default('omitted') }}"
+      CentOS:      "{{ docker_ee_subscriptions_centos|default('omitted') }}"
+      OracleLinux: "{{ docker_ee_subscriptions_oracle|default('omitted') }}"
+      SLES:        "{{ docker_ee_subscriptions_sles  |default('omitted') }}"
+

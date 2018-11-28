@@ -1,0 +1,22 @@
+---
+#
+# Modes.
+#
+- name: "Login to Docker Store"
+  shell: diver store --username {{ docker_hub_id }} --password {{ docker_hub_password }}
+  register: store_login
+  when: diver_store_role_mode == "lookup"
+
+- name: "Lookup Subscriptions Information"
+  include_tasks: "lookup/main.yml"
+  when: diver_store_role_mode == "lookup"
+  with_items:
+    - "ubuntu"
+    - "centos"
+    - "oracle"
+    - "rhel"
+    - "sles"
+
+- name: "Assign Subscriptions."
+  include_tasks: "assign/main.yml"
+  when: diver_store_role_mode == "assign"

@@ -1,0 +1,7 @@
+---
+- include_tasks: "RedHat/{{ distribution }}.yml"
+  when: distribution == ansible_distribution
+  with_items:
+    - "RedHat"
+  loop_control:
+    loop_var: distribution

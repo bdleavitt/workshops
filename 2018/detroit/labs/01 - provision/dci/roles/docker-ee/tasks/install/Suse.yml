@@ -1,0 +1,245 @@
+---
+#
+# Pre installation tasks.
+#
+- include_tasks: ".unix.pre.yml"
+
+- name: "Determine NTP package"
+  set_fact:
+    ntp_package:  "{% if infra_stack == 'aws' %}chrony{% else %}ntp{% endif %}"
+
+
+- name: "Install dependencies."
+  zypper:
+    name: [ "{{ ntp_package }}" ]
+    state: present
+  retries: 30
+  delay: 10
+  register: install_dependencies
+  until: install_dependencies.rc == 0
+  when: not enable_offline_install
+
+#
+# Chrony configuration on AWS
+#
+- name: "Configure chrony on AWS"
+  when: infra_stack == "aws"
+  lineinfile:
+    line: "server 169.254.169.123 prefer iburst"
+    path: "/etc/chrony.conf"
+
+- name: "Remove existing pool config on AWS"
+  when: infra_stack == "aws"
+  lineinfile:
+    regexp: "^pool.*"
+    line: ""
+    path: "/etc/chrony.conf"
+
+- name: "Enable chrony service on AWS"
+  when: infra_stack == "aws"
+  service:
+    name: "chronyd"
+    enabled: "yes"
+    state: "restarted"
+
+#
+# FYI: libcgroup1 is not available in SLES 15
+# https://www.suse.com/releasenotes/x86_64/SUSE-SLES/15/#Packages.Deprecated
+#
+- name: "Ensure libcgroup1 is present"
+  zypper:
+    name: libcgroup1
+    state: latest
+  when: ansible_distribution_version is version('15', '<')
+
+
+# This package conflicts with docker-ee installation.
+# (they both have a version of docker-init)
+- name: Ensure catatonit is NOT present
+  package:
+    name: catatonit
+    state: absent
+
+
+- name: "Online install."
+  when: not enable_offline_install
+  block:
+  - name: "Add Docker GPG key (from {{ docker_ee_repository_url }}/gpg)."
+    rpm_key:
+      key: "{{ docker_ee_repository_url }}/gpg"
+      state: present
+    register: add_repository_key
+    ignore_errors: true
+
+  - name: "Ensure curl is present (on older systems without SNI)."
+    zypper:
+      name: curl
+      state: latest
+    when: add_repository_key is failed
+
+  - name: "Download GPG key (alternative for older systems without SNI)."
+    shell: "curl -sSL {{ docker_ee_repository_url }}/gpg -o /tmp/storebits.gpg && echo '' >> /tmp/storebits.gpg"
+    args:
+      warn: no
+    when: add_repository_key is failed
+
+  - name: "Add Docker rpm key (alternative for older systems without SNI)."
+    shell: "rpm --import /tmp/storebits.gpg"
+    args:
+      warn: no
+    when: add_repository_key is failed
+
+  # We don't have a package specifically for 12.2 - the testing uses 12.3 instead.
+  # If this ends up becoming a pattern for other versions as well, we should probably
+  # change this to be a dictionary lookup or something.
+  - set_fact:
+      repo_version: "{{ '12.3' if ansible_distribution_version == '12.2' else ansible_distribution_version }}"
+
+  - name: "Add Docker EE repository {{ docker_ee_release_channel }}-{{ docker_ee_version }}."
+    zypper_repository:
+      name: "docker-ee.repo"
+      description: "Docker Enterprise"
+      repo: "{{ docker_ee_repository_url }}/{{ repo_version }}/x86_64/{{ docker_ee_repository }}"
+      runrefresh: "yes"
+      state: present
+
+  - name: "Install Docker EE (version: {{ docker_ee_version }})."
+    zypper:
+      name: "{{ docker_ee_package }}"
+      state: present
+      disable_gpg_check: true
+    retries: 30
+    delay: 10
+    register: install_docker_ee
+    until: install_docker_ee is succeeded
+
+- name: "Offline installation."
+  when: enable_offline_install
+  block:
+  - name: "Copy package."
+    copy:
+      src: "{{ docker_ee_package_sles | default(docker_ee_package) }}"
+      dest: "/tmp/{{ docker_ee_package_sles | default(docker_ee_package) | basename }}"
+
+  - name: "Copy gpg key."
+    copy:
+      src: "{{ docker_ee_gpg_sles | default(docker_ee_gpg) }}"
+      dest: "/tmp/{{ docker_ee_gpg_sles | default(docker_ee_gpg) | basename }}"
+
+  - name: "Import gpg key."
+    shell: "rpm --import /tmp/{{ docker_ee_gpg_sles | default(docker_ee_gpg) | basename }}"
+
+  - name: "Install package."
+    shell: "zypper --non-interactive install /tmp/{{ docker_ee_package_sles | default(docker_ee_package) | basename }}"
+
+- name: Open ports in the firewall for Docker EE
+  shell:
+    /sbin/SuSEfirewall2 open EXT {{ item.protocol | upper }} {{ item.port }}
+  with_items:
+    - name: "Port for SSH"
+      port: 22
+      protocol: tcp
+    - name: "Port for the UCP web UI and API"
+      port: 80
+      protocol: tcp
+    - name: "BGPPort"
+      port: 179
+      protocol: tcp
+    - name: "Port for the UCP web UI and API"
+      port: 443
+      protocol: tcp
+    - name: "Port for the Docker Swarm manager. Used for backwards compatibility"
+      port: 2376
+      protocol: tcp
+    - name: "Port for communication between swarm nodes"
+      port: 2377
+      protocol: tcp
+    - name: "Port for overlay networking (udp)"
+      port: 4789
+      protocol: udp
+    - name: "KubeAPIServerPort"
+      port: 6443
+      protocol: tcp
+    - name: "KubeReverseProxyPort"
+      port: 6444
+      protocol: tcp
+    - name: "Port for gossip-based clustering (tcp)"
+      port: 7946
+      protocol: tcp
+    - name: "Port for gossip-based clustering (udp)"
+      port: 7946
+      protocol: udp
+    - name: "Port for kubelet"
+      port: 10250
+      protocol: tcp
+    - name: "Port for a TLS proxy that provides access to UCP, Docker Engine, and Docker Swarm"
+      port: 12376
+      protocol: tcp
+    - name: "Port for a TLS proxy that provides access to UCP, Docker Engine, and Docker Swarm"
+      port: 12377
+      protocol: tcp
+    - name: "EtcdReverseProxyPort"
+      port: 12378
+      protocol: tcp
+    - name: "Port for internal node configuration, cluster configuration, and HA"
+      port: 12379
+      protocol: tcp
+    - name: "Port for internal node configuration, cluster configuration, and HA"
+      port: 12380
+      protocol: tcp
+    - name: "Port for the certificate authority"
+      port: 12381
+      protocol: tcp
+    - name: "Port for the UCP certificate authority"
+      port: 12382
+      protocol: tcp
+    - name: "Port for the authentication storage backend"
+      port: 12383
+      protocol: tcp
+    - name: "Port for the authentication storage backend for replication across managers"
+      port: 12384
+      protocol: tcp
+    - name: "Port for the authentication service API"
+      port: 12385
+      protocol: tcp
+    - name: "Port for the authentication worker"
+      port: 12386
+      protocol: tcp
+    - name: "Port for the metrics service"
+      port: 12387
+      protocol: tcp
+    - name: "Port for the Kubernetes API Server"
+      port: 12388
+      protocol: tcp
+
+- name: "Allow other IP protocols through the firewall."
+  shell:
+    /sbin/SuSEfirewall2 open EXT IP {{ item.proto }}
+  loop:
+    - name: "Encapsulating Security Payload (ESP) protocol"
+      proto: esp
+
+- name: Creates Firewall Config Directory
+  file:
+    path:  /etc/sysconfig/SuSEfirewall2.d/defaults
+    state: directory
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Creates Firewall Config File
+  copy:
+    content: "FW_LO_NOTRACK=no\n"
+    dest:  /etc/sysconfig/SuSEfirewall2.d/defaults/99-docker.cfg
+    owner: root
+    group: root
+    mode: 0644
+
+- name: "Apply the rules"
+  shell:
+    /sbin/SuSEfirewall2 start
+#
+# Post installation tasks.
+#
+
+- include_tasks: ".unix.post.yml"

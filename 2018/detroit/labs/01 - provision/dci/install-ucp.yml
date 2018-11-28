@@ -1,0 +1,156 @@
+---
+- hosts: localhost
+  roles:
+  - role: validate-ucp
+  tags:
+  - validate
+  any_errors_fatal: true
+
+- import_playbook: "initialize-swarm.yml"
+
+- name: "Install Kubernetes storage support"
+  hosts: all:!windows
+  roles:
+  - { role: 'kubernetes-nfs-storage', when: enable_kubernetes_nfs_storage }
+  tags: ['storage']
+
+- name: "Install kubectl"
+  hosts: managers
+  gather_facts: False
+  roles:
+    - role: kubectl
+      when: ucp_ver == "latest" or ucp_ver is version('3.0.0', '>=')
+  tags: ['ucp', 'UCP']
+  vars:
+    ucp_ver: "{{ docker_ucp_version | default('latest') }}"
+
+- name: "Prepare Kubernetes Cloud Provider"
+  hosts: all:!windows
+  gather_facts: False
+  roles:
+    - role: kubernetes-cloud-provider
+      when: ucp_ver == "latest" or ucp_ver is version('3.0.0', '>=')
+  tags: ['ucp', 'UCP']
+  vars:
+    ucp_ver: "{{ docker_ucp_version | default('latest') }}"
+
+- hosts: ucp-load-balancer
+  roles:
+  - role: load-balancer
+  tags: ['ucp', 'UCP', 'load-balancer', 'ucp-load-balancer']
+  vars:
+  - frontend: "{{ docker_ucp_lb }}"
+  - backends: "{{ groups['ucp'] }}"
+  - ports:
+    - 80
+  - ssl_ports:
+    - 443
+    - 6443
+
+- import_playbook: "pull-ucp-images.yml"
+  when:  use_dev_version | default(false)
+
+- name: "Install UCP"
+  hosts: ucp-primary
+  gather_facts: False
+  roles:
+  - { role: docker-ucp,   docker_ucp_role_mode: "install" }
+  tags: ['ucp', 'UCP']
+
+- name: "Verify Swarm state (managers only)"
+  hosts: managers
+  gather_facts: False
+  roles:
+  - role: docker-swarm
+  tags: ['check', 'swarm', 'Swarm', 'ucp', 'UCP', 'dtr', 'DTR']
+  vars:
+    expected_docker_swarm_managers: "{{ groups['managers'] | length }}"
+    expected_docker_swarm_workers:  "{{ groups['workers'] | length }}"
+    docker_swarm_role_mode:         "validate"
+
+- name: "Install UCP client bundle"
+  hosts: localhost
+  gather_facts: False
+  roles:
+  - role: docker-ucp-bundle
+  tags: ['ucp', 'UCP']
+
+- name: "Install Cloudstor"
+  hosts: all:!windows
+  gather_facts: False
+  roles:
+  - role: cloudstor-install
+    when: cloudstor_plugin_version != "disabled"
+  tags: ['swarm', 'Swarm', 'cloudstor', 'Cloudstor']
+
+# Extra step for AWS
+- name: "Kubernetes AWS Settings"
+  hosts: localhost
+  gather_facts: False
+  roles:
+  - role: kubernetes-aws
+    when: infra_stack == "aws" and
+          ( ucp_ver == "latest" or ucp_ver is version('3.0.0', '>=') ) and
+          enable_kubernetes_aws_efs
+  tags: ['ucp', 'UCP']
+  vars:
+    ucp_ver: "{{ docker_ucp_version | default('latest') }}"
+
+# Extra step for Azure
+- name: "Kubernetes Azure Settings"
+  hosts: ucp-primary
+  gather_facts: False
+  tasks:
+  - name: "Use kubernetes orchestrator for linux-workers"
+    when: enable_kubernetes_azure_file and infra_stack == "azure" and
+        ( ucp_ver == "latest" or ucp_ver is version('3.0.0', '>=') )
+    shell: |
+      eval "$(cat env.sh)"
+      docker node update --label-add com.docker.ucp.orchestrator.kubernetes=true {{ item }}
+      docker node update --label-add com.docker.ucp.orchestrator.swarm=false {{ item  }}
+    with_items:
+        - "{{groups['linux-workers']}}"
+  tags: ['ucp', 'UCP']
+  vars:
+    ucp_ver: "{{ docker_ucp_version | default('latest') }}"
+
+# Extra step for Azure
+- name: "Kubernetes Azure Settings"
+  hosts: localhost
+  gather_facts: False
+  tasks:
+  - name: "Create Azure File StorageClass Configuration"
+    when: enable_kubernetes_azure_file and infra_stack == "azure" and
+            ( ucp_ver == "latest" or ucp_ver is version('3.0.0', '>=') )
+    template:
+      src: azure-file-storageclass.yaml.j2
+      dest: "{{playbook_dir}}/kubernetes-templates/azure/file/storageclass.yaml"
+      mode: 0644
+
+  - name: "Apply Azure File StorageClass Configuration"
+    when: enable_kubernetes_azure_file and infra_stack == "azure" and
+            ( ucp_ver == "latest" or ucp_ver is version('3.0.0', '>=') )
+    shell: |
+      eval "$(cat env.sh)"
+      kubectl apply -f "{{playbook_dir}}/kubernetes-templates/azure/file/storageclass.yaml"
+  tags: ['ucp', 'UCP']
+  vars:
+    ucp_ver: "{{ docker_ucp_version | default('latest') }}"
+
+- name: "Verify UCP state (managers)"
+  hosts: managers
+  gather_facts: False
+  roles:
+  - role: docker-ucp
+  tags: ['check', 'ucp', 'UCP', 'swarm', 'Swarm']
+  vars:
+    docker_ucp_role_mode: "validate-managers"
+
+- name: "Verify UCP state (workers)"
+  hosts: workers
+  gather_facts: False
+  roles:
+  - role: docker-ucp
+  tags: ['check', 'ucp', 'UCP', 'swarm', 'Swarm']
+  vars:
+    docker_ucp_role_mode: "validate-workers"

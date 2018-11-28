@@ -1,0 +1,40 @@
+---
+docker_ee_repo: "https://storebits.docker.com/ee"
+
+docker_ee_repository_url_defaults:
+  'Debian': "{{docker_ee_repo}}/{{ ansible_distribution | lower }}/{{ docker_ee_subscription }}/{{ ansible_distribution | lower }}"
+  'CentOS': "{{ docker_ee_repo }}/{{ ansible_distribution | lower }}/{{ docker_ee_subscription }}/centos"
+  'OracleLinux': "{{ docker_ee_repo }}/{{ ansible_distribution | lower }}/{{ docker_ee_subscription }}/oraclelinux"
+  'RedHat': "{{ docker_ee_repo }}/{{ ansible_distribution | lower }}/{{ docker_ee_subscription }}/rhel"
+  'Suse': "{{ docker_ee_repo }}/{{ ansible_distribution | lower }}/{{ docker_ee_subscription }}/sles"
+
+docker_ee_repository_url: "{{ docker_ee_repository_url_defaults[ansible_distribution] | default(docker_ee_repository_url_defaults[ansible_os_family]) | default('') }}"
+
+docker_ee_version: "latest"
+docker_ee_default_version: '17.06.2'
+docker_ee_default_patch_level: '14'
+docker_ee_default_package_versions:
+  'Ubuntu': '3:{{docker_ee_default_version}}~ee~{{docker_ee_default_patch_level}}~3-0~ubuntu'
+  'CentOS': '{{docker_ee_default_version}}.ee.{{docker_ee_default_patch_level}}-3.el7'
+  'RedHat': '{{docker_ee_default_version}}.ee.{{docker_ee_default_patch_level}}-3.el7'
+  'OracleLinux': '{{docker_ee_default_version}}.ee.{{docker_ee_default_patch_level}}-3.el7'
+  'SLES': '2:{{docker_ee_default_version}}.ee.{{docker_ee_default_patch_level}}-3'
+docker_ee_package_version: "{{ docker_ee_default_package_versions[ansible_distribution] | default(docker_ee_default_package_versions[ansible_os_family]) | default(docker_ee_version) }}"
+docker_ee_package_provider_win: "DockerMsftProvider"
+docker_ee_release_channel: "stable"
+docker_ee_subscription: "{{ docker_ee_subscriptions[ansible_distribution] | default(docker_ee_subscriptions[ansible_os_family] | default(omit)) }}"
+
+docker_ee_extras_name_defaults:
+  'CentOS': "{{ docker_ee_repository_url }}/centos/docker-ee.repo"
+  'OracleLinux': "{% if infra_stack == \"aws\" %}rhui-REGION-rhel-server-extras{% else %}rhel-7-server-extras-rpms{% endif %}"
+  'RedHat': "{% if infra_stack == \"aws\" %}rhui-REGION-rhel-server-extras{% else %}rhel-7-server-extras-rpms{% endif %}"
+
+docker_ee_extras_name: "{{ docker_ee_extras_name_defaults[ansible_distribution] | default(docker_ee_extras_name_defaults[ansible_os_family]) | default('') }}"
+
+docker_ucp_image_repository: docker
+infra_stack: unknown
+docker_ee_role_mode: "install"
+enable_offline_install: False
+
+# Logs.
+docker_logs_directory: "{{ playbook_dir }}/.logs"

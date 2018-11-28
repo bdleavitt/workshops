@@ -1,0 +1,102 @@
+{
+  "Kubernetes Endpoint": {
+    "Kubernetes Endpoint Create": [],
+    "Kubernetes Endpoint Delete": [],
+    "Kubernetes Endpoint Delete Multiple": [],
+    "Kubernetes Endpoint Get": [],
+    "Kubernetes Endpoint List": [],
+    "Kubernetes Endpoint Patch": [],
+    "Kubernetes Endpoint Update": [],
+    "Kubernetes Endpoint Watch": []
+  },
+  "Kubernetes Endpoint/status": {
+    "Kubernetes Endpoint/status Create": [],
+    "Kubernetes Endpoint/status Delete": [],
+    "Kubernetes Endpoint/status Delete Multiple": [],
+    "Kubernetes Endpoint/status Get": [],
+    "Kubernetes Endpoint/status List": [],
+    "Kubernetes Endpoint/status Patch": [],
+    "Kubernetes Endpoint/status Update": [],
+    "Kubernetes Endpoint/status Watch": []
+  },
+  "Kubernetes Event": {
+    "Kubernetes Event Create": [],
+    "Kubernetes Event Delete": [],
+    "Kubernetes Event Delete Multiple": [],
+    "Kubernetes Event Get": [],
+    "Kubernetes Event List": [],
+    "Kubernetes Event Patch": [],
+    "Kubernetes Event Update": [],
+    "Kubernetes Event Watch": []
+  },
+  "Kubernetes Event/status": {
+    "Kubernetes Event/status Create": [],
+    "Kubernetes Event/status Delete": [],
+    "Kubernetes Event/status Delete Multiple": [],
+    "Kubernetes Event/status Get": [],
+    "Kubernetes Event/status List": [],
+    "Kubernetes Event/status Patch": [],
+    "Kubernetes Event/status Update": [],
+    "Kubernetes Event/status Watch": []
+  },
+  "Kubernetes Persistent Volume": {
+    "Kubernetes Persistent Volume Create": [],
+    "Kubernetes Persistent Volume Delete": [],
+    "Kubernetes Persistent Volume Delete Multiple": [],
+    "Kubernetes Persistent Volume Get": [],
+    "Kubernetes Persistent Volume List": [],
+    "Kubernetes Persistent Volume Patch": [],
+    "Kubernetes Persistent Volume Update": [],
+    "Kubernetes Persistent Volume Watch": []
+  },
+  "Kubernetes Persistent Volume Claim": {
+    "Kubernetes Persistent Volume Claim Create": [],
+    "Kubernetes Persistent Volume Claim Delete": [],
+    "Kubernetes Persistent Volume Claim Delete Multiple": [],
+    "Kubernetes Persistent Volume Claim Get": [],
+    "Kubernetes Persistent Volume Claim List": [],
+    "Kubernetes Persistent Volume Claim Patch": [],
+    "Kubernetes Persistent Volume Claim Update": [],
+    "Kubernetes Persistent Volume Claim Watch": []
+  },
+  "Kubernetes Persistent Volume Claim/status": {
+    "Kubernetes Persistent Volume Claim/status Create": [],
+    "Kubernetes Persistent Volume Claim/status Delete": [],
+    "Kubernetes Persistent Volume Claim/status Delete Multiple": [],
+    "Kubernetes Persistent Volume Claim/status Get": [],
+    "Kubernetes Persistent Volume Claim/status List": [],
+    "Kubernetes Persistent Volume Claim/status Patch": [],
+    "Kubernetes Persistent Volume Claim/status Update": [],
+    "Kubernetes Persistent Volume Claim/status Watch": []
+  },
+  "Kubernetes Persistent Volume/status": {
+    "Kubernetes Persistent Volume/status Create": [],
+    "Kubernetes Persistent Volume/status Delete": [],
+    "Kubernetes Persistent Volume/status Delete Multiple": [],
+    "Kubernetes Persistent Volume/status Get": [],
+    "Kubernetes Persistent Volume/status List": [],
+    "Kubernetes Persistent Volume/status Patch": [],
+    "Kubernetes Persistent Volume/status Update": [],
+    "Kubernetes Persistent Volume/status Watch": []
+  },
+  "Kubernetes Storage Class": {
+    "Kubernetes Storage Class Create": [],
+    "Kubernetes Storage Class Delete": [],
+    "Kubernetes Storage Class Delete Multiple": [],
+    "Kubernetes Storage Class Get": [],
+    "Kubernetes Storage Class List": [],
+    "Kubernetes Storage Class Patch": [],
+    "Kubernetes Storage Class Update": [],
+    "Kubernetes Storage Class Watch": []
+  },
+  "Kubernetes Storage Class/status": {
+    "Kubernetes Storage Class/status Create": [],
+    "Kubernetes Storage Class/status Delete": [],
+    "Kubernetes Storage Class/status Delete Multiple": [],
+    "Kubernetes Storage Class/status Get": [],
+    "Kubernetes Storage Class/status List": [],
+    "Kubernetes Storage Class/status Patch": [],
+    "Kubernetes Storage Class/status Update": [],
+    "Kubernetes Storage Class/status Watch": []
+  }
+}

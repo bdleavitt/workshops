@@ -1,0 +1,39 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: azure-disk-standard-lrs
+provisioner: kubernetes.io/azure-disk
+parameters:
+  storageaccounttype: Standard_LRS
+  kind: Managed
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: claim-one-gig
+spec:
+  storageClassName: azure-disk-standard-lrs
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: example-pod
+spec:
+  volumes:
+    - name: one-gigabyte
+      persistentVolumeClaim:
+       claimName:  claim-one-gig
+  containers:
+    - name: example-container
+      image: nginx
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+        - mountPath: "/usr/share/nginx/html"
+          name: one-gigabyte

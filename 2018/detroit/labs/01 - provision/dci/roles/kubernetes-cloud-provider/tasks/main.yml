@@ -1,0 +1,8 @@
+---
+- include_tasks: "{{ infra_stack }}.yml"
+  when: infra_stack == cloud
+  with_items:
+    - "aws"
+    - "azure"
+  loop_control:
+    loop_var: cloud

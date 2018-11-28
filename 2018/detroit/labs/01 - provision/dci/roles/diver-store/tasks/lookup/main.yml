@@ -1,0 +1,25 @@
+---
+- name: "Fetching subscriptions."
+  block:
+  - name: "Querying Subscription ID for {{ item }}"
+    ignore_errors: True
+    no_log: True
+    shell: diver store subscriptions list --firstactive --os {{ item }}
+    register: store_sub
+    failed_when: false
+  - name: "Storing information"
+    set_fact:
+        "docker_ee_subscriptions_{{ item }}": "{{ store_sub.stdout_lines[0] }}"
+    when: store_sub.rc is defined and store_sub.rc == 0
+  - name: "Fetching License File for {{ item }}"
+    ignore_errors: True
+    shell: diver store licenses get --subscription {{ store_sub.stdout_lines[0] }}
+    register: store_lic
+    when: store_sub.rc is defined and store_sub.rc == 0
+  - name: "Writing License File for {{ item }}"
+    copy:
+      content: "{{ store_lic.stdout_lines[0] }}"
+      dest: "docker-ee-{{ item }}.lic"
+      force: yes
+    when: store_lic and store_lic.stdout_lines is defined
+

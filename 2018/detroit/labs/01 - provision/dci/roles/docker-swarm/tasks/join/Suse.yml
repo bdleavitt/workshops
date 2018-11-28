@@ -1,0 +1,47 @@
+---
+- name: Check if already active.
+  shell:
+    docker info --format {%raw%} '{{.Swarm.LocalNodeState}}' {%endraw%}
+  register: _swarm_node_status
+
+- name: "Host is not a part the swarm yet."
+  when: _swarm_node_status.stdout_lines[0] == "inactive"
+  block:
+  - name: Join Docker Swarm.
+    shell: docker swarm join --token "{{ hostvars[groups[docker_swarm_leader][0]][docker_swarm_token_type].stdout }}" "{{ docker_swarm_listen_address | default(hostvars[groups[docker_swarm_leader][0]]['ansible_default_ipv4']['address']) }}"
+
+- name: "Additional SANs for a manager"
+  when: docker_swarm_token_type == 'swarm-manager-token'
+  block:
+  - name: "Wait for convergence"
+    wait_for:
+      timeout: 180
+  - name: "Look up the node's ID"
+    shell:
+      docker node inspect self --format {%raw%} '{{.ID}}' {%endraw%}
+    register: _this_node_id
+  - name: "Creating a fact for node id"
+    set_fact:
+      this_node_id: "{{ _this_node_id.stdout_lines[0] }}"
+  - name: "Look up the nodes current set of SANs"
+    shell:
+      docker node inspect --format {%raw%}'{{ index .Spec.Labels "com.docker.ucp.SANs" }}' {%endraw%} "{{ this_node_id }}"
+    register: _ucp_sans_labels
+  - name: "Creating a fact for labels"
+    set_fact:
+      initial_ucp_sans_labels: "{{ _ucp_sans_labels.stdout_lines[0] | default('') }}"
+  - name: "Make a copy"
+    set_fact:
+      extra_sans_labels: "{{initial_ucp_sans_labels}}"
+  - name: "Add the load balancer to the labels"
+    when:  docker_ucp_lb is defined and not docker_ucp_lb in initial_ucp_sans_labels
+    set_fact:
+      extra_sans_labels: "{{extra_sans_labels}},{{docker_ucp_lb}}"
+  - name: "Add the nodes public IP to the labels"
+    when: not hostvars[inventory_hostname]['ansible_host'] in initial_ucp_sans_labels
+    set_fact:
+      extra_sans_labels: "{{extra_sans_labels}},{{hostvars[inventory_hostname]['ansible_host']}}"
+  - name: "Commit the updated labels"
+    when: extra_sans_labels != initial_ucp_sans_labels
+    shell:
+      docker node update --label-add com.docker.ucp.SANs="{{extra_sans_labels}}" "{{ this_node_id }}"

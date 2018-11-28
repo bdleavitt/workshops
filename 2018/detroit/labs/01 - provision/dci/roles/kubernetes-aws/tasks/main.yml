@@ -1,0 +1,45 @@
+---
+- name: "Create the service account"
+  shell: >
+    eval "$(cat env.sh)" && kubectl apply -f "{{playbook_dir}}/kubernetes-templates/aws/efs/service-account.yaml"
+  when: enable_kubernetes_aws_efs and client_bundle
+  register: service_account
+
+- name: "Create the role"
+  shell: >
+    diver ucp auth roles create --rolename efs-provisioner-runner
+    --ruleset "{{playbook_dir}}/kubernetes-templates/aws/efs/provisioner-runner-rules.json"
+  when: service_account.rc == 0
+  register: efs_role_creation
+
+- name: "Lookup the role ID"
+  shell: >
+    diver ucp auth roles list | grep efs-provisioner-runner | awk '{ print $1 }'
+  when: efs_role_creation.rc == 0
+  register: efs_role_id_lookup
+
+- name: "Set role ID fact"
+  set_fact:
+    efs_provisioner_role_id: "{{ efs_role_id_lookup.stdout_lines[0] }}"
+  when: efs_role_id_lookup.rc == 0
+
+- name: "Grant service account efs-provisioner-role"
+  shell: >
+    diver ucp auth grants set --subject system%3Aserviceaccount%3Adefault%3Aefs-provisioner
+    --type all --collection kubernetesnamespaces
+    --role "{{ efs_provisioner_role_id }}"
+  when:  efs_role_id_lookup.rc == 0
+  register: efs_role_grant
+
+- name: "Configure EFS Provisioner Role."
+  template:
+    src: efs-provisioner.yaml.j2
+    dest: "{{playbook_dir}}/kubernetes-templates/aws/efs/provisioner.yaml"
+    mode: 0644
+  when: efs_role_grant.rc == 0
+  register: config
+
+- name: "Create EFS provisioner"
+  shell: >
+     eval "$(cat env.sh)" && kubectl apply -f "{{playbook_dir}}/kubernetes-templates/aws/efs/provisioner.yaml"
+  when: efs_role_grant.rc == 0

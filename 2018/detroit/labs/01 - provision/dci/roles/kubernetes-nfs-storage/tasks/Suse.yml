@@ -1,0 +1,16 @@
+---
+- name: "Install required NFS dependencies (SLES)."
+  when: ansible_os_family == 'Suse'
+  block:
+  - name: "Install nfs-client."
+    zypper:
+      name: "nfs-client"
+      state: present
+  - service:
+      name: "rpcbind"
+      state: "started"
+      enabled: true
+  - service:
+      name: "rpc-statd"
+      state: "started"
+      enabled: true

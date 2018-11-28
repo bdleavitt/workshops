@@ -1,0 +1,32 @@
+---
+#
+# Set facts.
+#
+
+- name: "Set 'docker_ce_repository' fact."
+  set_fact:
+    docker_ce_repository: "{{ docker_ce_release_channel }}{% if docker_ce_version != 'latest' %}-{{ docker_ce_version }}{% endif %}"
+
+- name: "Set 'docker_ce_package' fact."
+  set_fact:
+    docker_ce_package: "docker-ce{% if docker_ce_package_version != 'latest' %}-{{ docker_ce_package_version }}{% endif %}"
+
+#
+# Remove previously installed versions of Docker.
+#
+- name: "Ensure old versions of Docker are not installed."
+  package:
+    name: '{{ package }}'
+    state: absent
+  with_items:
+    - containerd
+    - docker
+    - docker-ce
+    - docker-common
+    - docker-engine
+    - docker-libnetwork
+    - docker-runc
+    - yast2-docker
+    - runc
+  loop_control:
+    loop_var: package

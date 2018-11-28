@@ -1,0 +1,20 @@
+---
+- when: not enable_offline_install
+  block:
+  # Begin block: not enable_offline_install
+  - assert:
+      that:
+        - docker_ee_subscriptions_centos is defined
+      msg: "You need 'docker_ee_subscriptions_centos' defined in order to install Docker EE on CentOS hosts."
+  # End block: not enable_offline_install
+
+- when: enable_offline_install
+  block:
+  # Begin block: enable_offline_install
+  - assert:
+      that:
+        - (docker_ee_package_redhat | default(docker_ee_package)) is defined
+  # End block: enable_offline_install
+
+# No DTR / UCP / Engine version assertions necessary at this time.
+

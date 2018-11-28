@@ -1,0 +1,69 @@
+---
+
+- name: "Install dracut-fips"
+  become: true
+  yum:
+    name: "dracut-fips"
+    state: latest
+    update_cache: true
+
+- name: "Check if aes supported"
+  shell: grep -qw aes /proc/cpuinfo
+  register: aes_supported
+
+- name: "Install dracut-fips-aesni"
+  become: true
+  yum:
+    name: "dracut-fips-aesni"
+    state: latest
+    update_cache: true
+  when: aes_supported.rc == 0
+
+- name: "Check if prelink is installed"
+  yum:
+    list: prelink
+  register: prelink_installed
+
+- name: "Disable prelinking when installed"
+  become: true
+  block:
+    - lineinfile:
+        path: /etc/sysconfig/prelink
+        regexp: '^PRELINKING'
+        line: 'PRELINKING=no'
+    - shell: prelink -uav
+  when: prelink_installed.results | selectattr("yumstate", "match", "installed") | list | length > 0
+
+- name: "Regnerate initramfs"
+  become: true
+  shell: dracut -f
+
+- name: "Enable fips in kernel boot arguments"
+  shell: grubby --update-kernel=$(grubby --default-kernel) --args=fips=1
+
+- name: "Check if /boot is on a separate filesystem"
+  shell: findmnt -no uuid /boot
+  failed_when: False
+  register: boot_uuid
+
+- name: "Add boot UUID to kernel boot arguments"
+  become: true
+  shell: grubby --update-kernel=$(grubby --default-kernel) --args=boot=UUID={{ boot_uuid.stdout }}
+  when: boot_uuid.stdout != ''
+
+- name: "Check if we need to reboot"
+  shell: "[ $(cat /proc/sys/crypto/fips_enabled) -eq 0 ]"
+  failed_when: False
+  register: needs_reboot
+
+- name: "Reboot to apply FIPS changes"
+  reboot:
+  when: needs_reboot.rc == 0
+
+- name: "Get FIPS status"
+  shell: cat /proc/sys/crypto/fips_enabled
+  register: fips_status
+
+- assert:
+    that: "fips_status.stdout == '1'"
+    msg: "FIPS was not successfully enabled."

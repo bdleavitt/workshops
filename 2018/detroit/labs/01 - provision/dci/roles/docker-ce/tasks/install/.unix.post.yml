@@ -1,0 +1,149 @@
+---
+#
+# Check installation.
+#
+
+- name: "Ensure /etc/docker dir exists."
+  file:
+    path: /etc/docker
+    state: directory
+
+#
+# Configure TCP certs if enabled
+#
+
+- name: "Install pyOpenSSL"
+  pip:
+    name: pyopenssl
+  when: docker_engine_enable_remote_tcp
+
+- name: "Copy engine CA certs"
+  copy:
+    src: "{{ docker_engine_ca_file }}"
+    dest: /etc/docker/ca.pem
+    owner: root
+    group: root
+    mode: 0644
+  when: docker_engine_enable_remote_tcp
+
+- name: "Copy engine CA key"
+  copy:
+    src: "{{ docker_engine_ca_key_file }}"
+    dest: /etc/docker/ca-key.pem
+    owner: root
+    group: root
+    mode: 0644
+  when: docker_engine_enable_remote_tcp
+
+- name: "Generate private key for docker engine"
+  openssl_privatekey:
+    path: /etc/docker/key.pem
+    size: 4096
+  when: docker_engine_enable_remote_tcp
+
+- name: "Generate host csr for docker engine"
+  openssl_csr:
+    path: /etc/docker/server.csr
+    privatekey_path: /etc/docker/key.pem
+    common_name: "{{ansible_hostname}}"
+    digest: sha256
+  when: docker_engine_enable_remote_tcp
+
+# NB: once Ansible 2.6 ships we should be able to use the ownca provider with the openssl_certificate
+# ansible module instead of shelling out here
+# https://github.com/ansible/ansible/pull/35840
+- name: "Generate host certs for docker engine"
+  block:
+  - shell: echo subjectAltName = DNS:`hostname`,IP:{{ ansible_host}},IP:127.0.0.1 > extfile.cnf
+  - shell: echo extendedKeyUsage = serverAuth >> extfile.cnf
+  - shell: openssl x509 -req -days 365 -sha256 -in /etc/docker/server.csr -CA /etc/docker/ca.pem -CAkey /etc/docker/ca-key.pem -CAcreateserial -out /etc/docker/cert.pem -extfile extfile.cnf
+  when: docker_engine_enable_remote_tcp
+
+- when: docker_ee_daemon_options is not defined
+  set_fact:
+    docker_ee_daemon_options: { }
+  when: docker_engine_enable_remote_tcp
+
+- name: "Ensure /etc/systemd/system/docker.service.d exists."
+  file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+  when: docker_engine_enable_remote_tcp
+
+- name: "Add drop-in file for dockerd.service"
+  copy:
+    content: "[Service]\nExecStart=\nExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:2376"
+    dest: /etc/systemd/system/docker.service.d/tcp-remote.conf
+    mode: 0644
+  when: docker_engine_enable_remote_tcp
+
+- name: "Add certificate settings to daemon options"
+  set_fact:
+    docker_ee_daemon_options: "{{ docker_ee_daemon_options|combine({ 'tlsverify': true, 'tlscacert': '/etc/docker/ca.pem', 'tlscert': '/etc/docker/cert.pem', 'tlskey': '/etc/docker/key.pem' }) }}"
+  when: docker_engine_enable_remote_tcp
+
+- name: "Reload systemd"
+  systemd:
+    daemon_reload: yes
+  when: docker_engine_enable_remote_tcp
+
+#
+# Set additional daemon options
+#
+
+- name: "Configure additional engine options"
+  copy:
+    content: "{{ docker_ce_daemon_options | to_nice_json }}"
+    dest: /etc/docker/daemon.json
+    mode: 0644
+  when: docker_ce_daemon_options is defined
+  register: daemon_options
+
+- name: "Remove daemon config when empty"
+  file:
+    path: /etc/docker/daemon.json
+    state: absent
+  when: docker_ce_daemon_options is not defined
+  register: daemon_options
+
+#
+# Permissions.
+#
+
+- name: "Get current user name (no sudo)."
+  become: False
+  set_fact:
+    current_user: "{{ ansible_user }}"
+
+- name: "Adding existing user {{ current_user }} to group docker."
+  user:
+    name: "{{ current_user }}"
+    groups: docker
+    append: yes
+  when:
+    - current_user != "root"
+
+#
+# Check if docker works correctly.
+#
+
+- name: "Test Docker."
+  shell: "docker version"
+  register: run_docker
+  failed_when: False
+
+- name: "Reload service docker (if not already running)"
+  systemd:
+    name: docker
+    state: restarted
+  when: run_docker.rc != 0 or daemon_options.changed
+
+- name: "Enable service docker."
+  service:
+    name: docker
+    enabled: yes
+    state: started
+
+- name: "Test Docker."
+  shell: "docker version"
+  when: run_docker.rc != 0

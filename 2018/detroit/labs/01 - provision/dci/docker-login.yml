@@ -1,0 +1,10 @@
+---
+
+- name: "Docker login"
+  hosts: all
+  gather_facts: false
+  become: True
+  tasks:
+  - name: "docker login"
+    raw: docker login -u '{{ dev_registry_username }}' -p '{{ dev_registry_password }}'
+    when: dev_registry_username | default("") != "" and dev_registry_password | default("") != ""

@@ -1,0 +1,117 @@
+---
+- set_fact:
+    cert: ""
+    cert_bindmount: ""
+
+- name: "Check for certificate file (at '{{ docker_ucp_cert_file }}')."
+  delegate_to: localhost
+  stat:
+    path: "{{ docker_ucp_cert_file }}"
+  become: no
+  register: cert_stat
+
+- name: "Check for key file (at '{{ docker_ucp_key_file }}')."
+  delegate_to: localhost
+  stat:
+    path: "{{ docker_ucp_key_file }}"
+  become: no
+  register: key_stat
+
+- name: "Check for CA certificate file (at '{{ docker_ucp_ca_file }}')."
+  delegate_to: localhost
+  stat:
+    path: "{{ docker_ucp_ca_file }}"
+  become: no
+  register: ca_stat
+
+- name: "sanity check"
+  fail:
+    msg: "Certificate file '{{ docker_ucp_cert_file }}' exists, but key file '{{ docker_ucp_key_file }}' does not - both must exist if one is provided."
+  when: cert_stat.stat.exists == true and key_stat.stat.exists == false
+
+- name: "sanity check"
+  fail:
+    msg: "Key file '{{ docker_ucp_key_file }}' exists, but certificate file '{{ docker_ucp_cert_file }}' does not - both must exist if one is provided."
+  when: key_stat.stat.exists == true and cert_stat.stat.exists == false
+
+- name: "Copy certificate file."
+  copy:
+    src: "{{ docker_ucp_cert_file }}"
+    dest: "/etc/ssl/cert.pem"
+  when: cert_stat.stat.exists == true
+
+- name: "Copy key file."
+  copy:
+    src: "{{ docker_ucp_key_file }}"
+    dest: "/etc/ssl/key.pem"
+  when: key_stat.stat.exists == true
+
+- name: "Copy CA certificate file."
+  copy:
+    src: "{{ docker_ucp_ca_file }}"
+    dest: "/etc/ssl/ca.pem"
+  when: ca_stat.stat.exists == true
+
+# HAProxy is very particular about its certs.
+# Create a single, combined cert file from the component files
+# with things being in the proper order.
+- name: "Create combined certificate."
+  when: cert_stat.stat.exists == true or key_stat.stat.exists == true or ca_stat.stat.exists == true
+  block:
+  - name: "Create empty file for combined certificate."
+    shell: "rm -f /etc/ssl/combined.pem; touch /etc/ssl/combined.pem"
+
+  - name: "Add key file to combined certificate."
+    shell: "cat /etc/ssl/key.pem >> /etc/ssl/combined.pem"
+    when: key_stat.stat.exists == true
+
+  - name: "Add certificate file to combined certificate."
+    shell: "cat /etc/ssl/cert.pem >> /etc/ssl/combined.pem"
+    when: cert_stat.stat.exists == true
+
+  - name: "Add CA certificate file to combined certificate."
+    shell: "cat /etc/ssl/ca.pem >> /etc/ssl/combined.pem"
+    when: ca_stat.stat.exists == true
+
+
+- name: "Check for combined certificate file."
+  stat:
+    path: "/etc/ssl/combined.pem"
+  register: combined_stat
+
+- set_fact:
+    cert: "crt /etc/ssl/combined.pem"
+    cert_bindmount: "--volume /etc/ssl/combined.pem:/etc/ssl/combined.pem:ro"
+  when: combined_stat.stat.exists == true
+
+- name: "Configure HAProxy."
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy.cfg
+    mode: 0644
+  register: config
+
+- include_tasks: "{{ os_family }}.yml"
+  when: ansible_os_family == os_family
+  tags:
+    - jq
+  with_items:
+    - "Debian"
+    - "RedHat"
+  loop_control:
+    loop_var: os_family
+
+- set_fact: portlist=""
+
+- name: "Generate Port List."
+  set_fact: portlist="{{portlist}} --expose {{port}} --publish {{port}}:{{port}}"
+  with_items: "{{ [ 8181 ] | union(ports) | union(ssl_ports) }}"
+  loop_control:
+    loop_var: port
+
+- name: "Remove existing HAProxy Container."
+  shell: "docker stop --time 60 load-balancer; docker rm -f load-balancer"
+  failed_when: False
+
+- name: "Start HAProxy Container."
+  shell: "docker run --name load-balancer --detach --restart unless-stopped {{ cert_bindmount }} --volume /etc/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro {{ portlist }} haproxy:1.8-alpine haproxy -d -f /usr/local/etc/haproxy/haproxy.cfg"

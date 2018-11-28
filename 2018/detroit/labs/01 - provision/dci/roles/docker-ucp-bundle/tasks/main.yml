@@ -1,0 +1,20 @@
+---
+- name: "Login to UCP"
+  shell: >
+    diver ucp login --username "{{ docker_ucp_admin_username }}"
+    --password "{{ docker_ucp_admin_password }}"
+    --url "https://{{hostvars[groups['linux-ucp-manager-primary'][0]]['ansible_host']}}"
+    --ignorecert
+  register: ucp_login
+
+- name: "Fetch client bundle"
+  shell: >
+    diver ucp client-bundle &&
+    unzip -o "{{playbook_dir}}/ucp-bundle.zip" &&
+    if [ -d "/mnt/ucp-bundle" ]; then unzip -d /mnt/ucp-bundle -o "{{playbook_dir}}/ucp-bundle.zip"; fi
+  when: ucp_login.rc == 0
+  register: client_bundle
+
+- name: "Set client bundle fact"
+  set_fact:
+    client_bundle_available: client_bundle.rc == 0

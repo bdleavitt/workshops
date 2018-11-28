@@ -1,0 +1,27 @@
+---
+
+# Log in, so that we can access the required images.
+- import_playbook: "docker-login.yml"
+
+- name: "Query DTR images."
+  hosts: dtr-primary
+  gather_facts: false
+  become: True
+  tasks:
+  - name: "Pull DTR first"
+    shell: docker pull  "{{ docker_dtr_image_repository }}/dtr:{{ docker_dtr_version }}"
+
+  - name: "Query for required DTR images"
+    shell: docker run --rm "{{ docker_dtr_image_repository }}/dtr:{{ docker_dtr_version }}" images
+    register: dtr_images
+
+# Pull all required DTR images to all DTR nodes
+- name: "Pull DTR images"
+  hosts: dtr
+  gather_facts: false
+  strategy: free
+  become: True
+  tasks:
+  - name: "Pull DTR images"
+    shell:  docker pull "{{ item }}"
+    with_items: "{{ hostvars[groups['dtr-primary'][0]].dtr_images.stdout_lines }}"

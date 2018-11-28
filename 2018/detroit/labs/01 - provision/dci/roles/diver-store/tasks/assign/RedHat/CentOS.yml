@@ -1,0 +1,5 @@
+---
+- set_fact:
+    docker_ee_subscriptions_centos: "{{hostvars['localhost']['docker_ee_subscriptions_centos']}}"
+    docker_ucp_license_path: "./docker-ee-centos.lic"
+  when: hostvars['localhost']['docker_ee_subscriptions_centos'] is defined

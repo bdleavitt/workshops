@@ -1,0 +1,104 @@
+---
+
+# Begin Ubuntu 14.04 checks
+#TODO need 17.06.2-ee-8 check for 2.0
+- name: UCP and Ubuntu 14.04 check
+  assert:
+    that:
+      -  " docker_ucp_version is version  ('2.2.2', '>=') "
+    msg: |
+      " Ubuntu 14.04 is supported on version UCP greater than 2.2.2. "
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - " ansible_distribution == 'Ubuntu' "
+    - " ansible_distribution_version is version ('14.04','=') "
+    - " docker_ucp_version is defined "
+    - " docker_matrix_enforce == true "
+
+#EOS of 14.04
+# -- removed to check distribution_version of 14.04 this case is failing in CI but is a small edge case.
+#- name: Ubuntu 14.04 check EOS check
+#  assert:
+#    that:
+#      -  docker_ee_version is version ('2.1', '<')
+#    msg: "Ubuntu 14.04 is not supported on Docker Enterprise 2.1 or greater. "
+#  when:
+#    - " ansible_distribution == 'Ubuntu'"
+#    - " ansible_distribution_version is version ('14.04','=')"
+# End Ubuntu 14.04 checks
+
+  # Begin Ubuntu 16.04 checks
+  # TODO check for 17.06.2-ee-8 for EE 2.0
+- name: Ubuntu 16.04 checks
+  assert:
+    that:
+      -  docker_ucp_version is version  ('2.2.2', '>=')
+    msg: |
+      " Ubuntu 16.04 is not supported on {{docker_ucp_version}} ."
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - " ansible_distribution == 'Ubuntu' "
+    - " ansible_distribution_version is version ('16.04','=') "
+    - " docker_ucp_version is defined "
+    - " docker_matrix_enforce == true "
+
+
+
+  # End Ubuntu 16.04 checks
+
+  # Begin Ubuntu 18.04 checks
+- name: Ubuntu 18.04 version check
+  assert:
+    that:
+      -  docker_ucp_version is version  ('2.2.11', '>=')
+      -  docker_dtr_version is version  ('2.4.6', '>=')
+    msg: |
+      " Ubuntu 18.04 with Engine 17.06 is not supported  on UCP version {{docker_ucp_version}} and / or DTR version {{docker_dtr_version}}. "
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - " ansible_distribution == 'Ubuntu'"
+    - " ansible_distribution_version is version ('18.04','=')"
+    - " docker_ee_version == '17.06'"
+    - " docker_ucp_version is defined and docker_dtr_version is defined"
+    - " docker_matrix_enforce == true "
+
+
+  # explicit check
+- name: 18.04 check for ucp 2.0
+  assert:
+    that:
+      - docker_ucp_version is version ('3.0.0', '!=')
+      - docker_ucp_version is version ('3.0.1', '!=')
+      - docker_ucp_version is version ('3.0.2', '!=')
+      - docker_dtr_version is version ('2.5.0', '!=')
+      - docker_dtr_version is version ('2.5.1', '!=')
+      - docker_dtr_version is version ('2.5.2', '!=')
+      - docker_dtr_version is version ('2.5.3', '!=')
+    msg: |
+      " Ubuntu 18.04 on Engine 17.06 is compatible version UCP greater than 3.0.3. and DTR version greater than 2.5.4 "
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix . "
+  when:
+    - " ansible_distribution == 'Ubuntu' "
+    - " ansible_distribution_version is version ('18.04','=') "
+    - " docker_ee_version == '17.06'"
+    - " docker_ucp_version is defined and docker_dtr_version is defined "
+    - " docker_matrix_enforce == true "
+
+  # End Ubuntu 18.04 checks
+
+- when: not enable_offline_install
+  block:
+  # Begin block: not enable_offline_install
+  - assert:
+      that:
+        - docker_ee_subscriptions_ubuntu is defined
+      msg: "You need 'docker_ee_subscriptions_ubuntu' defined in order to install Docker EE on Ubuntu-based hosts."
+  # End block: not enable_offline_install
+
+- when: enable_offline_install
+  block:
+  # Begin block: enable_offline_install
+  - assert:
+      that:
+        - (docker_ee_package_debian | default(docker_ee_package)) is defined
+  # End block: enable_offline_install

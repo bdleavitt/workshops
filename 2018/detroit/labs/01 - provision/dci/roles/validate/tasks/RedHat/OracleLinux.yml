@@ -1,0 +1,42 @@
+---
+- when: not enable_offline_install
+  block:
+  # Begin block: not enable_offline_install
+  - assert:
+      that:
+        - docker_ee_subscriptions_oracle is defined
+      msg: "You need 'docker_ee_subscriptions_oracle' defined in order to install Docker EE on OracleLinux hosts."
+  # End block: not enable_offline_install
+
+- when: enable_offline_install
+  block:
+  # Begin block: enable_offline_install
+  - assert:
+      that:
+        - (docker_ee_package_oracle | default(docker_ee_package)) is defined
+  # End block: enable_offline_install
+
+# TODO:
+# Oracle 7.5 limit to EE 2.1 values
+- name: OracleLinux 7.5 requires Enterprise Engine 18.09 or higher.
+  assert:
+    that:
+      -  " docker_ee_version is version ('18.09', '>=')"
+    msg: |
+      " Engine version 18.09+ is only supported on OracleLinux 7.5 or greater"
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - ansible_distribution_version == '7.5'
+    - " docker_matrix_enforce == true "
+
+# Oracle 7.3 limit to EE 17.06, EE 2.0 values
+- name: OracleLinux 7.3 EE 17.06 and EE 2.0 only
+  assert:
+    that:
+      - " docker_ee_version is version ('17.06', '=') "
+    msg: |
+      " Engine version 17.06 is only supported on OracleLinux 7.3. "
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - ansible_distribution_version == '7.3'
+    - " docker_matrix_enforce == true "

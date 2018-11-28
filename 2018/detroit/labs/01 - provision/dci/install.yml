@@ -1,0 +1,11 @@
+---
+#
+# DTR is the last component to install and importing the playbook will
+# import UCP, Swarm, Engine and others.
+#
+- import_playbook: "install-dtr.yml"
+
+#
+# Logs are optional
+#
+- import_playbook: "logs.yml"

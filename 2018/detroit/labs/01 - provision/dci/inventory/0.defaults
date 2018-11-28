@@ -1,0 +1,20 @@
+[all:vars]
+docker_hub_id=""
+docker_hub_password=""
+docker_ucp_admin_username="admin"
+ucp_pod_cidr = ""
+enable_kubernetes_aws_ebs = False
+enable_kubernetes_aws_efs = False
+enable_kubernetes_aws_load_balancer = False
+enable_kubernetes_azure_disk = False
+enable_kubernetes_azure_file = False
+enable_kubernetes_azure_load_balancer = False
+enable_kubernetes_cloud_provider = False
+enable_kubernetes_nfs_storage = False
+enable_offline_install = False
+docker_ucp_cert_file = ""
+docker_ucp_ca_file = ""
+docker_ucp_key_file  = ""
+docker_dtr_cert_file = ""
+docker_dtr_key_file = ""
+docker_dtr_ca_file = ""

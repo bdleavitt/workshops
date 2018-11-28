@@ -1,0 +1,29 @@
+---
+
+- name: "Install AUFS dependencies (Ubuntu 14.04)."
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version == '14.04'
+  block:
+  - shell: "uname -r"
+    register: uname_out
+  - name: "Install linux-image-extra-{{ uname_out.stdout }}."
+    apt:
+      name: "linux-image-extra-{{ uname_out.stdout }}"
+      state: present
+  - name: "Install linux-image-extra-virtual."
+    apt:
+      name: linux-image-extra-virtual
+      state: present
+
+- set_fact:
+    default_docker_storage_fstype: ext4
+    default_docker_storage_driver: aufs
+  when: >
+    not ( docker_ucp_version == "latest" or docker_ucp_version is version('3.0.0', '>=') )
+    or ( ansible_distribution == 'Ubuntu' and ansible_distribution_version == '14.04' )
+
+- set_fact:
+    default_docker_storage_fstype: ext4
+    default_docker_storage_driver: overlay2
+  when: >
+    ( docker_ucp_version == "latest" or docker_ucp_version is version('3.0.0', '>=') )
+    and not ( ansible_distribution == 'Ubuntu' and ansible_distribution_version == '14.04' )

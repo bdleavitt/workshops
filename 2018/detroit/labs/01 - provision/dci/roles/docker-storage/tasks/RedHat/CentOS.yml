@@ -1,0 +1,13 @@
+---
+
+- set_fact:
+    default_docker_storage_fstype: xfs
+    default_docker_storage_driver: devicemapper
+  when: >
+    not ( docker_ucp_version == "latest" or docker_ucp_version is version('3.0.0', '>=') )
+
+- set_fact:
+    default_docker_storage_fstype: xfs
+    default_docker_storage_driver: overlay2
+  when: >
+    ( docker_ucp_version == "latest" or docker_ucp_version is version('3.0.0', '>=') )

@@ -1,0 +1,21 @@
+---
+- set_fact:
+    docker_ucp_version_check: "{{ docker_ucp_version | regex_search('^([0-9]+\\.[0-9]+\\.[0-9]+).*') }}"
+
+- assert:
+    that:
+      - "docker_ucp_version == 'latest' or docker_ucp_version_check != ''"
+    msg: |
+       Docker UCP Version {{ docker_ucp_version }} is invalid.
+       Please set to latest, X.Y.Z[BUILD] where BUILD may be empty or an arbitrary string
+       e.g. 3.0.0, 3.0.0-latest, 3.1.0-beta1"
+
+- assert:
+    that:
+      - "not dev_registry_user is defined"
+    msg: "INTERNAL: Friendly reminder that dev_registry_user has been renamed to dev_registry_username"
+
+- assert:
+    that: docker_ucp_admin_password is defined
+    msg: "docker_ucp_admin_password is required."
+

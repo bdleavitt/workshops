@@ -1,0 +1,35 @@
+---
+- name: "Check if shared mount have been set"
+  shell: |
+    if [ "$(cat /proc/1/mountinfo | grep shared | grep '/ / ' | awk '{ print $5 }')" == '/' ];
+    then echo "True"
+    else echo "False"
+    fi
+  register: root_shared_mountpoint_check
+
+- name: "Make /, /dev, /mnt, and /run shared mounts"
+  become: true
+  when: root_shared_mountpoint_check.stdout_lines[0]
+  shell: |
+    mount --make-shared /
+    mount --make-shared /dev
+    mount --make-shared /mnt
+    mount --make-shared /run
+
+- name: "Create upstart to root shared on startup"
+  become: true
+  when: root_shared_mountpoint_check.stdout_lines[0]
+  copy:
+    content: |
+      # This makes the root filesystem shared containers can properly bind mount volumes
+      description   "Make required volumes shared"
+      author        "Docker Certified Infrastructure"
+      start on startup
+      script
+            mount --make-shared /
+            mount --make-shared /dev
+            mount --make-shared /mnt
+            mount --make-shared /run
+      end script
+    dest: /etc/init/mount-shared-root.conf
+

@@ -1,0 +1,98 @@
+---
+- set_fact:
+    enable_offline_install: "{{ enable_offline_install | default(True) | bool }}"
+    docker_matrix_enforce: "{{docker_matrix_enforce | default(true) | bool }}"
+#Begin 18.09 block
+- name: 18.09 Engine and 2.1 EE version sanity check
+  assert:
+    that:
+      - " docker_ucp_version is version ('3.1', '>=')"
+      - " docker_dtr_version is version ('2.6', '>=')"
+    msg: |
+      " Engine version {{docker_ee_version}} is supported with UCP 3.1 or greater and DTR 2.6 or greater"
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix"
+  when:
+    - "docker_ee_version is version ('18.09', '>=')"
+    - "docker_ucp_version is defined"
+    - "docker_dtr_version is defined "
+    - "docker_matrix_enforce == true "
+# But what if they don't want DTR
+- name: 18.09 Engine and 2.1 EE version sanity check without DTR
+  assert:
+    that: " docker_ucp_version is version ('3.1', '>=')"
+    msg: |
+      " Engine version {{docker_ee_version}} is not compatible with {{docker_ucp_version}} ."
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - "docker_ee_version is version ('18.09', '>=') "
+    - "docker_ucp_version is defined "
+    - "docker_dtr_version is undefined "
+    - "docker_matrix_enforce == true "
+# But what if they don't want UCP?
+
+- name: 18.09 Engine and 2.1 EE version sanity check without UCP
+  assert:
+    that: " docker_dtr_version is version ('2.6', '>=')"
+    msg:
+      - " Engine version {{docker_ee_version}} is not compatible with {{docker_dtr_version}} ."
+      - " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - " docker_ee_version is version ('18.09', '>=') "
+    - " docker_ucp_version is undefined "
+    - " docker_dtr_version is defined) "
+    - " docker_matrix_enforce == true "
+
+# But what if they want engine only?
+#End 18.09 Block
+
+#Start 17.06 / 2.0 Block
+
+
+
+- name: EE 17.06 and EE 2.0 version sanity check
+  assert:
+    that:
+      -  " (docker_ucp_version is version ('2.2', '>=') and docker_ucp_version is version ('3.1', '<')) "
+      -  " (docker_dtr_version is version ('2.3', '>=') and docker_dtr_version is version('2.6','<')) "
+    msg: |
+      " Engine version {{docker_ee_version}} is compatible with UCP 2.2 - 3.0  and DTR 2.4 - 2.5 . "
+      " Cluster configured with UCP version {{docker_ucp_version}} and DTR version {{docker_dtr_version}} . "
+      " Please see the compatibility matrix: https://success.docker.com/article/compatibility-matrix ."
+  when:
+    - " docker_ee_version is version ('17.06', '=')"
+    - " docker_ucp_version is defined "
+    - " docker_dtr_version is defined "
+    - " docker_matrix_enforce == true "
+
+#End 17.06 / 2.0 Block
+#Begin FIPS Block
+
+- name: FIPS Distro compatability check
+  assert:
+    that:
+      - " ansible_os_family == 'Windows' or ansible_distribution == 'RedHat' "
+    msg: |
+      " Docker Engine FIPS mode is not compatible with {{ ansible_os_family }}/{{ ansible_distribution}} . "
+  when:
+    - " docker_enable_fips == true "
+
+- name: FIPS Docker engine version compatability check
+  assert:
+    that:
+      - " docker_ee_version is version ('18.03', '>=') "
+    msg: |
+      " Engine version {{docker_ee_version}} is not compatible with FIPS mode, only engine versions >= 18.03 are supported . "
+  when:
+    - " docker_enable_fips == true "
+
+#End FIPS Block
+
+- include_tasks: "{{ ansible_os_family }}.yml"
+  when: ansible_os_family == os_family
+  with_items:
+    - "Debian"
+    - "Windows"
+    - "RedHat"
+    - "Suse"
+  loop_control:
+    loop_var: os_family

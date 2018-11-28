@@ -1,0 +1,82 @@
+- name: "Install requirements."
+  # when: not enable_offline_install
+  block:
+  # Debian/Ubuntu.
+  - name: Check if apt-get is installed.
+    raw: apt-get --version
+    failed_when: False
+    register: has_apt
+
+  - name: Install python2 [apt-get].
+    raw: apt-get update -q && apt-get install -qy python-minimal python-pip
+    register: installed_via_apt
+    when: has_apt.rc == 0
+
+  # RHEL/CentOS/Oracle.
+  - name: Check if yum is installed.
+    raw: yum --version
+    register: has_yum
+    failed_when: False
+
+  - name: "yum"
+    when: has_yum.rc == 0 and installed_via_apt.get('skipped')
+    block:
+    - name: Clean yum
+      raw: yum clean all
+
+    - name: Install yum-utils.
+      raw: "yum install -y yum-utils"
+
+    - name: Install epel-release.
+      raw: "yum install -y epel-release"
+      failed_when: False
+
+    - name: Enable developer EPEL (pip).
+      raw: yum-config-manager --enable ol7_developer_EPEL
+      failed_when: False
+
+  # yum behavior is sometime surprising.
+  # If you run `yum install a b` and `a` exists but `b` doesn't, no errors are reported.
+  # However, `yum install b` will fail.
+  # We can use that 'feature' to enumerate multiple naming format for the
+  # package pip e.g. (python-pip and rh-python27-python-pip)
+  - name: Install python2 [yum].
+    raw: yum install -y python python-pip rh-python27-python-pip
+    register: installed_via_yum
+    when: has_yum.rc == 0 and installed_via_apt.get('skipped')
+
+  # SLES.
+  - name: Check if zypper is installed.
+    raw: zypper --version
+    failed_when: False
+    register: has_zypper
+
+  - name: Install python2 [zypper].
+    raw: zypper -i install -f -y -n python python-pip python2-pip
+    register: installed_via_zypper
+    when: has_zypper.rc == 0 and installed_via_apt.get('skipped') and installed_via_yum.get('skipped')
+
+  #
+  # Verify if pip is installed (and force installation if not).
+  #
+  - name: Ensure pip has been installed properly.
+    raw: pip --version
+    failed_when: False
+    register: has_pip
+
+  - raw: curl --tlsv1 https://bootstrap.pypa.io/get-pip.py | python
+    when: has_pip.rc != 0
+
+  - name: Ensure pip has been installed properly.
+    raw: pip --version
+
+- name: Install python-xml [zypper].
+  raw: zypper install -y -n python-xml
+  when: has_zypper.rc == 0 and installed_via_apt.get('skipped') and installed_via_yum.get('skipped')
+
+#
+# Verify
+#
+
+- name: Ensure python2 has been installed properly.
+  raw: test -e /usr/bin/python

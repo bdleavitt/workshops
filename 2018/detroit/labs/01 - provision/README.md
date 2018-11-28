@@ -192,20 +192,20 @@ We will use a utility container, `stevenfollis/dci:detroit`, to handle the deplo
     ```powershell
     docker run -it --rm `
         -v "${pwd}:/dci/azure/" `
-        -v "${DCI_SSH_KEY}:/tmp/ssh_private_key" `
         "stevenfollis/dci:detroit" `
-        sh -c "terraform init -var 'ssh_private_key_path=/tmp/ssh_private_key'; `
-                terraform apply -auto-approve -var 'ssh_private_key_path=/tmp/ssh_private_key' -parallelism=64;"
+        sh -c "terraform init -var 'ssh_private_key_path=/dci/azure/id_rsa'; `
+                terraform apply -auto-approve -var 'ssh_private_key_path=/dci/azure/id_rsa' -parallelism=64;"
     ```
 
     Docker for Mac + Bash:
     ```bash
     docker run -it --rm \
         -v "$(pwd):/dci/azure/" \
-        -v "${DCI_SSH_KEY}:/tmp/ssh_private_key:ro" \
-        "dockereng/certified-infrastructure:stack-azure-73cd3d9" \
-        sh -c "terraform init -var 'ssh_private_key_path=/tmp/ssh_private_key'; \
-                terraform apply -auto-approve -var 'ssh_private_key_path=/tmp/ssh_private_key' -parallelism=64;"
+        "stevenfollis/dci:detroit" \
+        sh -c "terraform init -var \
+                'ssh_private_key_path=/dci/azure/id_rsa'; \
+                terraform apply -auto-approve -var 'ssh_private_key_path=/dci/azure/id_rsa' \
+                -parallelism=64;"
     ```
 
 Terraform provisioning can take 10-15 minutes to complete. 
@@ -216,7 +216,6 @@ Terraform provisioning can take 10-15 minutes to complete.
     ```powershell
     docker run -it --rm `
         -v "${pwd}:/dci/azure/" `
-        -v "${DCI_SSH_KEY}:/tmp/ssh_private_key:ro" `
         "stevenfollis/dci:detroit" `
         sh -c "export ANSIBLE_CONFIG=./ansible.cfg; `
                 ansible-playbook install.yml"
@@ -225,11 +224,9 @@ Terraform provisioning can take 10-15 minutes to complete.
     Docker for Mac + Bash:
     ```bash
     docker run -it --rm \
-        -v "$(pwd):/dci/azure/" \
-        -v "${DCI_SSH_KEY}:/tmp/ssh_private_key:ro" \
+        -v "${pwd}:/dci/azure/" \
         "stevenfollis/dci:detroit" \
-        sh -c "terraform init ${TERRAFORM_OPTIONS}; \
-                terraform destroy -force -var 'ssh_private_key_path=/tmp/ssh_private_key' -parallelism=64;"
+        sh -c "ansible-playbook install.yml"
     ```
 Ansible can take 10-15 minutes to finish its configuration process.
 
@@ -270,3 +267,27 @@ When comfortable with the application, the lab is concluded.
 ## Wrap-Up
 
 In this lab we completed a series of exercises to stand up a Docker Enterprise cluster within Azure. We now have an environment to buld upon in subsequent labs. 
+
+## Appendix
+
+To remove a cluster we can use `terraform destroy` in the utility container while at the `dci` path.
+
+Docker for Windows (in Linux mode) + PowerShell:
+    ```powershell
+    docker run -it --rm `
+        -v "${pwd}:/dci/azure/" `
+        "stevenfollis/dci:detroit" `
+        sh -c "terraform init -var 'ssh_private_key_path=/dci/azure/id_rsa'; `
+                terraform destroy -auto-approve -var 'ssh_private_key_path=/dci/azure/id_rsa' -parallelism=64;"
+    ```
+
+    Docker for Mac + Bash:
+    ```bash
+    docker run -it --rm \
+        -v "$(pwd):/dci/azure/" \
+        "stevenfollis/dci:detroit" \
+        sh -c "terraform init -var \
+                'ssh_private_key_path=/dci/azure/id_rsa'; \
+                terraform destroy -auto-approve -var 'ssh_private_key_path=/dci/azure/id_rsa' \
+                -parallelism=64;"
+    ```

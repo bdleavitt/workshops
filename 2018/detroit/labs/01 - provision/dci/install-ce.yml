@@ -1,0 +1,79 @@
+---
+- name: "Install Ansible requirements (Python)"
+  hosts: all:!windows
+  strategy: free
+  gather_facts: False
+  roles:
+  - role: ansible-requirements
+  tags: ['always']
+
+- hosts: all
+  roles:
+  - role: validate
+  tags:
+  - validate
+  any_errors_fatal: true
+
+- name: "Format Docker storage"
+  hosts: all:!windows
+  roles:
+  - { role: 'docker-storage', when: docker_storage_volume is defined }
+  tags: ['storage', 'docker-storage']
+
+- name: "Install Docker CE"
+  hosts: all
+  roles:
+  - role: docker-ce
+  tags: ['engine', 'docker']
+
+- name: "Initialize Swarm"
+  hosts: ucp-primary
+  roles:
+  - { role: docker-swarm, docker_swarm_role_mode: "init" }
+  tags: ['swarm', 'Swarm', 'managers']
+
+- name: "Join Swarm (as managers)"
+  gather_facts: False
+  hosts: managers:!ucp-primary
+  roles:
+  - role: docker-swarm
+  tags: ['swarm', 'Swarm']
+  vars:
+    docker_swarm_token_type: "swarm-manager-token"
+    docker_swarm_leader:     "ucp-primary"
+    docker_swarm_role_mode:  "join"
+
+- name: "Join Swarm (as workers)"
+  gather_facts: False
+  hosts: workers
+  roles:
+  - role: docker-swarm
+  tags: ['swarm', 'Swarm']
+  vars:
+    docker_swarm_token_type: "swarm-worker-token"
+    docker_swarm_leader:     "ucp-primary"
+    docker_swarm_role_mode:  "join"
+
+- name: "Verify Swarm state (managers only)"
+  hosts: managers
+  roles:
+  - role: docker-swarm
+  tags: ['check', 'swarm', 'Swarm']
+  vars:
+    expected_docker_swarm_managers: "{{ groups['managers'] | length }}"
+    expected_docker_swarm_workers:  "{{ groups['workers'] | length }}"
+    docker_swarm_role_mode:         "validate"
+
+- name: "Install Cloudstor"
+  hosts: all:!windows
+  roles:
+  - role: cloudstor-install
+    when: cloudstor_plugin_version != "disabled"
+  tags: ['swarm', 'Swarm', 'cloudstor', 'Cloudstor']
+
+#
+# Get the logs.
+#
+- import_playbook: "logs.yml"
+# Install & Configure Load Balancers
+#

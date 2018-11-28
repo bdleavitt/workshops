@@ -1,0 +1,28 @@
+---
+docker_ce_repo: "https://download.docker.com"
+
+docker_ce_repository_url_defaults:
+  'Debian': "{{docker_ce_repo}}/linux/{{ ansible_distribution | lower }}"
+  'CentOS': "{{ docker_ce_repo }}/linux/centos"
+
+docker_ce_repository_url: "{{ docker_ce_repository_url_defaults[ansible_distribution] | default(docker_ce_repository_url_defaults[ansible_os_family]) | default('') }}"
+
+docker_ce_version: "latest"
+docker_ce_default_version: '17.06.2'
+docker_ce_default_patch_level: '0'
+docker_ce_default_package_versions:
+  'Ubuntu': '{{docker_ce_default_version}}~ce-0~ubuntu'
+  'CentOS': '{{docker_ce_default_version}}.ce-1.el7.centos'
+docker_ce_package_version: "{{ docker_ce_default_package_versions[ansible_distribution] | default(docker_ce_default_package_versions[ansible_os_family]) | default(docker_ce_version) }}"
+docker_ce_release_channel: "stable"
+
+docker_ce_extras_name_defaults:
+  'CentOS': "{{ docker_ce_repository_url }}/docker-ce.repo"
+
+docker_ce_extras_name: "{{ docker_ce_extras_name_defaults[ansible_distribution] | default(docker_ce_extras_name_defaults[ansible_os_family]) | default('') }}"
+
+infra_stack: unknown
+docker_ce_role_mode: "install"
+
+# Logs.
+docker_logs_directory: "{{ playbook_dir }}/.logs"

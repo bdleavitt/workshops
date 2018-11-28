@@ -1,0 +1,5 @@
+---
+kubectl_version_for_ucp:
+    v3.0: "v1.8.11"
+    v3.1: "v1.11.2"
+    latest: "v1.8.11"

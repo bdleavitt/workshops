@@ -1,0 +1,22 @@
+---
+- name: "Use kubernetes orchestrator for linux-workers"
+  when: enable_kubernetes_azure_load_balancer
+  shell: |
+    eval "$(cat env.sh)"
+    docker node update --label-add com.docker.ucp.orchestrator.kubernetes=true {{ item }}
+    docker node update --label-add com.docker.ucp.orchestrator.swarm=false {{ item  }}
+  with_items:
+      - "{{groups['linux-workers']}}"
+
+- name: "Create Azure File StorageClass Configuration"
+  template:
+    src: azure-file-storageclass.yaml.j2
+    dest: "{{playbook_dir}}/kubernetes-templates/azure/file/storageclass.yaml"
+    mode: 0644
+  when: enable_kubernetes_azure_file
+
+- name: "Apply Azure File StorageClass Configuration"
+  when: enable_kubernetes_azure_file
+  shell: |
+    eval "$(cat env.sh)"
+    kubectl apply -f "{{playbook_dir}}/kubernetes-templates/azure/file/storageclass.yaml"

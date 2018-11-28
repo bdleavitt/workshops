@@ -1,0 +1,13 @@
+---
+- set_fact:
+    docker_dtr_version_check: "{{ docker_dtr_version | regex_search('^([0-9]+\\.[0-9]+\\.[0-9]+).*') }}"
+
+- assert:
+    that:
+      - "docker_dtr_version == 'latest' or docker_dtr_version_check != ''"
+    msg: |
+      Docker DTR Version {{ docker_dtr_version }} is invalid.
+      Please set to latest, X.Y.Z[BUILD] where BUILD may be empty or an arbitrary string
+      e.g. 2.5.0, 2.5.0-latest, 2.6.0-beta1
+
+

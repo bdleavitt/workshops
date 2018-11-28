@@ -1,0 +1,19 @@
+---
+#
+# Set facts.
+#
+
+- name: "Set 'docker_ee_repository' and 'docker_ee_package' facts."
+  set_fact:
+    docker_ee_repository: "{{ docker_ee_release_channel }}{% if docker_ee_version != 'latest' %}-{{ docker_ee_version }}{% endif %}"
+    docker_ee_package: "docker-ee{% if docker_ee_package_version != 'latest' %}-{{ docker_ee_package_version }}{% endif %}"
+  when: docker_ee_package is undefined
+
+#
+# Remove previously installed versions of Docker.
+#
+- name: "Ensure old versions of Docker are not installed."
+  ignore_errors: true
+  package:
+    name: [ 'containerd', 'docker', 'docker-ce', 'docker-common', 'docker-engine', 'docker-libnetwork', 'docker-runc', 'yast2-docker', 'runc' ]
+    state: absent

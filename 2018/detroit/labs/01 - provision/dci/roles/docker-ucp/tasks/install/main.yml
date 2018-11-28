@@ -1,0 +1,192 @@
+---
+- name: "Check if UCP is running."
+  shell: "docker ps -q --filter name=ucp-controller"
+  register: _ucp_already_running
+
+- name: "Set ucp_already_running fact."
+  set_fact:
+    ucp_already_running: "{{ _ucp_already_running.stdout_lines | length > 0 }}"
+
+- name: "Install."
+  when: "not ucp_already_running"
+  block:
+  - name: "Pull UCP (version: {{ docker_ucp_version }})."
+    shell: >
+      docker image pull
+      "{{ docker_ucp_image_repository }}/ucp:{{ docker_ucp_version }}"
+    register: pulled
+    retries: 10
+    until: pulled is succeeded
+    when: not enable_offline_install
+
+  - name: "Import UCP images."
+    when: enable_offline_install
+    block:
+      # Offline.
+      - name: "Non-Windows systems."
+        when: ansible_os_family != "Windows"
+        block:
+        # Non-Windows.
+        - name: "Copy tarball."
+          copy:
+            src: "{{ docker_ucp_tarball }}"
+            dest: "/tmp/{{ docker_ucp_tarball | basename }}"
+
+        - name: "Load tarball."
+          shell: "docker load < /tmp/{{ docker_ucp_tarball | basename }}"
+        # End of Non-Windows.
+
+      - name: "Windows systems."
+        when: ansible_os_family == "Windows"
+        block:
+        # Windows.
+        - name: "Create temp directory."
+          win_tempfile:
+            state: directory
+            suffix: archive
+          register: tmp_dir
+
+        - name: "Copy tarball."
+          copy:
+            src: "{{ docker_ucp_windows_tarball }}"
+            dest: "{{ tmp_dir.path }}\\{{ docker_ucp_windows_tarball | basename }}"
+
+        - name: "Load tarball."
+          win_shell: "docker load < {{ tmp_dir.path }}\\{{ docker_ucp_windows_tarball | basename }}"
+        # End of Windows.
+
+  - name: "Check for certificate file (at '{{ docker_ucp_cert_file }}')."
+    delegate_to: localhost
+    stat:
+      path: "{{ docker_ucp_cert_file }}"
+    become: no
+    register: cert_stat
+
+  - name: "Check for key file (at '{{ docker_ucp_key_file }}')."
+    delegate_to: localhost
+    stat:
+      path: "{{ docker_ucp_key_file }}"
+    become: no
+    register: key_stat
+
+  - name: "Check for CA certificate file (at '{{ docker_ucp_ca_file }}')."
+    delegate_to: localhost
+    stat:
+      path: "{{ docker_ucp_ca_file }}"
+    become: no
+    register: ca_stat
+
+  - name: "sanity check"
+    fail:
+      msg: "Certificate file '{{ docker_ucp_cert_file }}' exists, but key file '{{ docker_ucp_key_file }}' does not - both must exist if one is provided."
+    when: cert_stat.stat.exists == true and key_stat.stat.exists == false
+
+  - name: "sanity check"
+    fail:
+      msg: "Key file '{{ docker_ucp_key_file }}' exists, but certificate file '{{ docker_ucp_cert_file }}' does not - both must exist if one is provided."
+    when: key_stat.stat.exists == true and cert_stat.stat.exists == false
+
+  - name: "Import certificates."
+    when: cert_stat.stat.exists == true or ca_stat.stat.exists == true or key_stat.stat.exists == true
+    block:
+    # Start block (certificates exist).
+    - name: "Install docker-py."
+      pip:
+        name: docker-py
+      when: not enable_offline_install
+
+    - name: "Create volume for certificates."
+      shell: "docker volume create ucp-controller-server-certs"
+      register: volume_created
+
+    - name: "Get volume path."
+      shell: "docker volume inspect ucp-controller-server-certs --format {% raw %}'{{ .Mountpoint }}'{% endraw %}"
+      register: certificates_volume
+      when: volume_created is succeeded
+
+    - name: "Copy certificate file."
+      copy:
+        src: "{{ docker_ucp_cert_file }}"
+        dest: "{{ certificates_volume.stdout_lines[0] }}/cert.pem"
+      when: volume_created is succeeded and cert_stat.stat.exists == true
+
+    - name: "Copy CA certificate file."
+      copy:
+        src: "{{ docker_ucp_ca_file }}"
+        dest: "{{ certificates_volume.stdout_lines[0] }}/ca.pem"
+      when: volume_created is succeeded and ca_stat.stat.exists == true
+
+    - name: "Copy key file."
+      copy:
+        src: "{{ docker_ucp_key_file }}"
+        dest: "{{ certificates_volume.stdout_lines[0] }}/key.pem"
+      when: volume_created is succeeded and key_stat.stat.exists == true
+    # End block (certificates exist).
+
+  - name: "Check for license file (at {{ docker_ucp_license_path }})."
+    local_action: stat path="{{ docker_ucp_license_path }}"
+    become: no
+    register: license_stat
+
+  - set_fact:
+      subscription_file: "{{ docker_ucp_license_path | basename }}"
+
+  - name: "Read license file."
+    when: license_stat.stat.exists == true
+    block:
+    # Start block (license file exists).
+    - name: "Copy subscription."
+      copy:
+        src: "{{ docker_ucp_license_path }}"
+        dest: "/tmp/"
+
+  - name: "Install UCP (version: {{ docker_ucp_version }})."
+    shell: >
+      docker run
+      --rm
+      --name ucp
+      --volume /var/run/docker.sock:/var/run/docker.sock
+      {% if license_stat.stat.exists == true %} --volume "/tmp/{{ subscription_file }}:/config/docker_subscription.lic:ro" {% endif %}
+      --env "UCP_ADMIN_USERNAME={{ docker_ucp_admin_username }}"
+      --env "UCP_ADMIN_PASSWORD={{ docker_ucp_admin_password }}"
+      {{ docker_ucp_image_repository }}/ucp:{{ docker_ucp_version }}
+      install
+      {% if use_dev_version | default(False) %}
+      --image-version "dev:"
+      {% endif %}
+      {% if use_dev_version | default(False) or docker_engine_enable_remote_tcp | default(False) %}
+      --force-insecure-tcp
+      {% endif %}
+      {% if docker_engine_enable_remote_tcp | default(False) %}
+      --swarm-port 12377
+      {% endif %}
+      --host-address "{{ docker_swarm_listen_address | default(ansible_default_ipv4['address']) }}"
+      {% if docker_ucp_lb != "no_load_balancer_configured" %}
+      --san "{{ docker_ucp_lb }}"
+      {% endif %}
+      {% if enable_kubernetes_cloud_provider %}
+      --cloud-provider "{{infra_stack}}"
+      {% endif %}
+      {% if ucp_pod_cidr != "" %}
+      --pod-cidr "{{ucp_pod_cidr}}"
+      {% endif %}
+      --san "{{ ansible_host }}"
+      {% if docker_ucp_install_args != "" %}
+      "{{ docker_ucp_install_args }}"
+      {% endif %}
+
+- name: "Use swarm orchestrator for linux-workers"
+  when: docker_worker_orchestration == "swarm"
+  shell: |
+    docker node update --label-add com.docker.ucp.orchestrator.kubernetes=false {{ hostvars[item]['ansible_nodename'] }}
+    docker node update --label-add com.docker.ucp.orchestrator.swarm=true {{ hostvars[item]['ansible_nodename']  }}
+  with_items:
+  - "{{groups['linux-workers']}}"
+
+- name: "Use kubernetes orchestrator for linux-workers"
+  when: docker_worker_orchestration == "kubernetes"
+  shell: |
+    docker node update --label-add com.docker.ucp.orchestrator.kubernetes=true {{ hostvars[item]['ansible_nodename'] }}
+    docker node update --label-add com.docker.ucp.orchestrator.swarm=false {{ hostvars[item]['ansible_nodename']  }}
+  with_items:
+  - "{{groups['linux-workers']}}"
