@@ -73,7 +73,7 @@ linux_worker = {
 }
 
 ## Windows worker image
-#windows_worker = {
+windows_worker = {
   publisher = "MicrosoftWindowsServer" # OS VHD publisher
   offer     = "WindowsServer"          # OS VHD offer
   sku       = "2016-DataCenter"        # OS VHD SKU
