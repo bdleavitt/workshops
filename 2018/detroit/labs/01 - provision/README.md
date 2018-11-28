@@ -108,9 +108,9 @@ Docker distributes development tooling for various operating systems, including 
     docker run hello-world
     ```
 
-1. If you are running Docker for Windows, toggle the environment to use Linux Containers by right-clicking on the tray icon and selecting "Linux Containers". 
+1. If you are running Docker for Windows, toggle the environment to use Linux Containers by right-clicking on the tray icon and selecting "Linux Containers"
 
-    
+    ![image](./media/000023.png)
 
     > This is done because the DCI installer container is implemented as a Linux Container, which requires a Linux environment to operate
 
@@ -166,21 +166,17 @@ In the folder for this lab is a directory called **dci**. Open it in your favori
 
 1. Set `docker_ee_subscriptions_ubuntu` equal to the GUID of your trial subscription. 
 
-    Retrieve this value by returning in the browser to the [Docker Store](https://store.docker.com) and login. Then click your username in the top right and select **My Content** from the dropdown. Select your subscription, and in the subscription details page grab just the GUID fro the URL in the right-hand panel. For example, the URL `https://storebits.docker.com/ee/ubuntu/sub-14903d9e-e2bc-42f9-97cb-90ba72ce87be` would result in a GUID of `14903d9e-e2bc-42f9-97cb-90ba72ce87be`. 
-
-1. The Docker License file is used by DCI, so while still in the Docker Store click **License Key** to download the file. Then, place it in the root of the `/dci` folder, as a peer to the `terraform.tfvars` file.
-
-    This file is referenced by `docker_ucp_license_path   = "./docker_subscription.lic"`
-
-    ![image](./media/000018.png)
-
-1. If your machine already has an SSH key generated, set its location with `ssh_private_key_path = "~/.ssh/id_rsa"`
-
-    Otherwise, in your bash shell execute `ssh-keygen` with default options and no passphrase. A key will be generated for you, which you can verify with `cat ~/.ssh/id_rsa` on the same
-
-    ![image](./media/000019.png)
+    Retrieve this value by returning in the browser to the [Docker Store](https://store.docker.com) and login. Then click your username in the top right and select **My Content** from the dropdown. Select your subscription, and in the subscription details page grab sub-GUID from the URL in the right-hand panel. For example, the URL `https://storebits.docker.com/ee/ubuntu/sub-14903d9e-e2bc-42f9-97cb-90ba72ce87be` would result in a GUID of `sub-14903d9e-e2bc-42f9-97cb-90ba72ce87be`. 
 
 1. The `Azure Credentials` section is where we set the values from our Azure AD Application. The `client_id`, `client_id`, and `tenant_id` were all visible in the AD Application's blad, and `subscription_id` is available in the Subscriptions section of the Azure Portal
+
+    ```sh
+    # Example:
+    client_id       = "f9dfedef-407d-40ce-92cb-eecdf0644b7b"
+    client_secret   = "L7y3f7z704T+R+yj0uu5VukXavAXtAIMwxhFPbl3zGw="
+    subscription_id = "c5941527-8d07-4ef8-aa76-e43dc151e0ac"
+    tenant_id       = "4430d72d-0d6a-40c2-8c3a-3110b1d9a3e3"
+    ```
 
 With the values customized to your subscription settings we are all set to deploy.
 
@@ -188,17 +184,89 @@ With the values customized to your subscription settings we are all set to deplo
 
 Once the pre-requisites are handled we are now ready to execute DCI. First we will use Terraform to provision the resources, and then we will execute Ansible to configure those resources
 
-1. Start ansible by first opening a bash shell and navigating to the `/dci` directory, and then executing:
+We will use a utility container, `stevenfollis/dci:detroit`, to handle the deployment. Inside of the container are the libraries we need, but we will mount our files inside via a bind mount to make them accessible.
 
-    ```sh
-    # Initialize the Terraform modules
-    terraform init
+1. To provision with Terraform, run the following from the `dci` path in your terminal window:
 
-    # Kick the tires and light the fires
-    terraform apply
+    Docker for Windows (in Linux mode) + PowerShell:
+    ```powershell
+    docker run -it --rm `
+        -v "${pwd}:/dci/azure/" `
+        -v "${DCI_SSH_KEY}:/tmp/ssh_private_key" `
+        "stevenfollis/dci:detroit" `
+        sh -c "terraform init -var 'ssh_private_key_path=/tmp/ssh_private_key'; `
+                terraform apply -auto-approve -var 'ssh_private_key_path=/tmp/ssh_private_key' -parallelism=64;"
     ```
 
+    Docker for Mac + Bash:
+    ```bash
+    docker run -it --rm \
+        -v "$(pwd):/dci/azure/" \
+        -v "${DCI_SSH_KEY}:/tmp/ssh_private_key:ro" \
+        "dockereng/certified-infrastructure:stack-azure-73cd3d9" \
+        sh -c "terraform init -var 'ssh_private_key_path=/tmp/ssh_private_key'; \
+                terraform apply -auto-approve -var 'ssh_private_key_path=/tmp/ssh_private_key' -parallelism=64;"
+    ```
 
+Terraform provisioning can take 10-15 minutes to complete. 
 
+1. To configure the environment with Ansible, run the following from the `dci` path in your terminal window:
+
+    Docker for Windows (in Linux mode) + PowerShell:
+    ```powershell
+    docker run -it --rm `
+        -v "${pwd}:/dci/azure/" `
+        -v "${DCI_SSH_KEY}:/tmp/ssh_private_key:ro" `
+        "stevenfollis/dci:detroit" `
+        sh -c "export ANSIBLE_CONFIG=./ansible.cfg; `
+                ansible-playbook install.yml"
+    ```
+
+    Docker for Mac + Bash:
+    ```bash
+    docker run -it --rm \
+        -v "$(pwd):/dci/azure/" \
+        -v "${DCI_SSH_KEY}:/tmp/ssh_private_key:ro" \
+        "stevenfollis/dci:detroit" \
+        sh -c "terraform init ${TERRAFORM_OPTIONS}; \
+                terraform destroy -force -var 'ssh_private_key_path=/tmp/ssh_private_key' -parallelism=64;"
+    ```
+Ansible can take 10-15 minutes to finish its configuration process.
+
+### Login to Docker Enterprise
+
+1. In the [Azure Portal](https://portal.azure.com) navigate to your Resource Group and inspect the newly provisioned and configured resources
+
+1. Locate the Public IP resource named **UCP**. Click it and on its blade copy its DNS name. 
+
+    ![image](./media/000024.png)
+
+    ![image](./media/000025.png)
+
+1. Open a browser tab and prepend **https://** to the DNS name. Docker Enterprise always functions over HTTPS.
+
+1. Your browser will present a security page. This is because Docker Enterprise by default installs with a set of self-signed certificates that are not trusted by your local certificate store. 
+
+    ![image](./media/000026.png)
+
+    In a real-world deployment we always replace these starter certificates with a set of certificates directly from a customer's corportate certificate authority. Click through the security concern to continue to the login page. 
+
+1. Login with **admin** and **DockerEE123!**, the values that were set in our `terraform.tfvars` file
+
+    ![image](./media/000027.png)
+
+1. When prompted for a license, click the **Upload License** button and select the `docker_subscription.lic` file that was downloaded from your subscription details page in the Docker Store 
+
+1. Welcome to the Universal Control Plane. This is a graphical user interface for operating a Docker Enterprise cluster. 
+
+    ![image](./media/000028.png)
+
+1. Take a moment to explore the application. 
+
+    Navigate to **Shared Resources** and then **Nodes** to see the cluster at a glance. Click on any node to get more information. 
+
+When comfortable with the application, the lab is concluded. 
 
 ## Wrap-Up
+
+In this lab we completed a series of exercises to stand up a Docker Enterprise cluster within Azure. We now have an environment to buld upon in subsequent labs. 
