@@ -224,9 +224,9 @@ Terraform provisioning can take 10-15 minutes to complete.
     Docker for Mac + Bash:
     ```bash
     docker run -it --rm \
-        -v "${pwd}:/dci/azure/" \
-        "stevenfollis/dci:detroit" \
-        sh -c "ansible-playbook install.yml"
+      -v "$(pwd):/dci/azure/" \
+      "stevenfollis/dci:detroit" \
+      sh -c "ansible-playbook install.yml"
     ```
 Ansible can take 10-15 minutes to finish its configuration process.
 
