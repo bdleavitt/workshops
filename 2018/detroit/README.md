@@ -18,3 +18,5 @@ Today we will begin with an overview of Docker Enterprise, including a discussio
 ## Resources
 
 - [Docker](https://docker.com)
+- [Docker Samples](https://github.com/dockersamples)
+- [Docker Lab](https://github.com/docker/labs)
