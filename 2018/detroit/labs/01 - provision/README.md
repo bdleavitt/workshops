@@ -274,21 +274,21 @@ To remove a cluster we can use `terraform destroy` in the utility container whil
 
 Docker for Windows (in Linux mode) + PowerShell:
     
-    ```powershell
-    docker run -it --rm `
-        -v "${pwd}:/dci/azure/" `
-        "stevenfollis/dci:detroit" `
-        sh -c "terraform init -var 'ssh_private_key_path=/dci/azure/id_rsa'; `
-                terraform destroy -auto-approve -var 'ssh_private_key_path=/dci/azure/id_rsa' -parallelism=64;"
-    ```
+  ```powershell
+  docker run -it --rm `
+      -v "${pwd}:/dci/azure/" `
+      "stevenfollis/dci:detroit" `
+      sh -c "terraform init -var 'ssh_private_key_path=/dci/azure/id_rsa'; `
+              terraform destroy -auto-approve -var 'ssh_private_key_path=/dci/azure/id_rsa' -parallelism=64;"
+  ```
 
-    Docker for Mac + Bash:
-    ```bash
-    docker run -it --rm \
-        -v "$(pwd):/dci/azure/" \
-        "stevenfollis/dci:detroit" \
-        sh -c "terraform init -var \
-                'ssh_private_key_path=/dci/azure/id_rsa'; \
-                terraform destroy -auto-approve -var 'ssh_private_key_path=/dci/azure/id_rsa' \
-                -parallelism=64;"
-    ```
+  Docker for Mac + Bash:
+  ```bash
+  docker run -it --rm \
+      -v "$(pwd):/dci/azure/" \
+      "stevenfollis/dci:detroit" \
+      sh -c "terraform init -var \
+              'ssh_private_key_path=/dci/azure/id_rsa'; \
+              terraform destroy -auto-approve -var 'ssh_private_key_path=/dci/azure/id_rsa' \
+              -parallelism=64;"
+  ```
