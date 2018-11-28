@@ -273,6 +273,7 @@ In this lab we completed a series of exercises to stand up a Docker Enterprise c
 To remove a cluster we can use `terraform destroy` in the utility container while at the `dci` path.
 
 Docker for Windows (in Linux mode) + PowerShell:
+    
     ```powershell
     docker run -it --rm `
         -v "${pwd}:/dci/azure/" `
