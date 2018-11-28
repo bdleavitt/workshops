@@ -8,7 +8,7 @@ Hello! Thank you for investing your time today to learn more about how the Docke
 
 Today we will begin with an overview of Docker Enterprise, including a discussion around use cases and commonly seen scenarios. We will then transition to a hands-on period with a series of exercises. 
 
-| Time | Description |
+| Approximate Timing | Description |
 | --- | --- |
 | 09:00 - 10:30 | Presentation: Overview of the Docker Enterprise Platform | 
 | 10:30 - 12:00 | Lab 01: Provisioning the Docker Enterprise Platform in Azure <br /><br />This lab uses the Docker Certified Infrastructure (DCI) project to first provision and then configure all necessary Azure resources for a highly-available Docker Enterprise environment. |
